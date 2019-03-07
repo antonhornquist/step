@@ -5,25 +5,28 @@
 -- 
 -- key2 = stop sequencer
 -- key3 = play sequencer
+--
 -- enc1 = main out level
 -- enc2 = tempo
 -- enc3 = swing amount
 -- 
 -- grid = edit trigs
 -- 
+
 engine.name = 'Ack'
 
 local ControlSpec = require 'controlspec'
 local Ack = require 'ack'
 
 local PSET = "step.pset"
--- TODO local PATTERN_FILE = "step.data"
+local PATTERN_FILE = "step.data"
 
 local TRIG_LEVEL = 15
 local PLAYPOS_LEVEL = 7
 local CLEAR_LEVEL = 0
 
-local grid_device
+local grid = grid.connect()
+local grid_connected = false
 
 local tempo_spec = ControlSpec.new(20, 300, ControlSpec.WARP_LIN, 0, 120, "BPM")
 local swing_amount_spec = ControlSpec.new(0, 100, ControlSpec.WARP_LIN, 0, 0, "%")
@@ -35,7 +38,7 @@ local gridwidth = MAXWIDTH
 local playing = false
 local queued_playpos
 local playpos = -1
-local timer
+local sequencer_metro
 
 local ppqn = 24 
 local ticks
@@ -45,11 +48,66 @@ local even_ppqn
 
 local trigs = {}
 
+local function cutting_is_enabled()
+  return params:get("last_row_cuts") == 2
+end
+
+local function set_trig(patternno, x, y, value)
+  trigs[patternno*MAXWIDTH*HEIGHT + y*MAXWIDTH + x] = value
+end
+
+local function trig_is_set(patternno, x, y)
+  return trigs[patternno*MAXWIDTH*HEIGHT + y*MAXWIDTH + x]
+end
+
+local function refresh_grid_button(x, y, refresh)
+  if grid.device then
+    if cutting_is_enabled() and y == 8 then
+      if x-1 == playpos then
+        grid:led(x, y, PLAYPOS_LEVEL)
+      else
+        grid:led(x, y, CLEAR_LEVEL)
+      end
+    else
+      if trig_is_set(params:get("pattern"), x, y) then
+        grid:led(x, y, TRIG_LEVEL)
+      elseif x-1 == playpos then
+        grid:led(x, y, PLAYPOS_LEVEL)
+      else
+        grid:led(x, y, CLEAR_LEVEL)
+      end
+    end
+    if refresh then
+      grid:refresh()
+    end
+  end
+end
+
+local function refresh_grid_column(x, refresh)
+  if grid.device then
+    for y=1,HEIGHT do
+      refresh_grid_button(x, y, false)
+    end
+    if refresh then
+      grid:refresh()
+    end
+  end
+end
+
+local function refresh_grid()
+  if grid.device then
+    for x=1,MAXWIDTH do
+      refresh_grid_column(x, false)
+    end
+    grid:refresh()
+  end
+end
+
 local function refresh_ui()
   local redraw_screen = false
-  local redraw_grid = false
+  local grid_dirty = false
 
-  --[[
+  --[[ TODO
   local arc_check = arc.device ~= nil
   if arc_connected ~= arc_check then
     arc_connected = arc_check
@@ -60,17 +118,18 @@ local function refresh_ui()
   if redraw_screen then
     redraw()
   end
-  if redraw_grid then
-    refresh_grid()
+
+  if grid.device then
+    if gridwidth ~= grid.cols then
+      gridwidth = grid.cols
+      grid_dirty = true
+    end
   end
-end
 
-local function set_trig(patternno, x, y, value)
-  trigs[patternno*MAXWIDTH*HEIGHT + y*MAXWIDTH + x] = value
-end
-
-local function trig_is_set(patternno, x, y)
-  return trigs[patternno*MAXWIDTH*HEIGHT + y*MAXWIDTH + x]
+  if grid_dirty then
+    refresh_grid()
+    grid_dirty = false
+  end
 end
 
 local function save_patterns()
@@ -108,55 +167,8 @@ local function load_patterns()
   end
 end  
 
-local function refresh_grid_button(x, y, refresh)
-  if grid_device then
-    if cutting_is_enabled() and y == 8 then
-      if x-1 == playpos then
-        grid_device:led(x, y, PLAYPOS_LEVEL)
-      else
-        grid_device:led(x, y, CLEAR_LEVEL)
-      end
-    else
-      if trig_is_set(params:get("pattern"), x, y) then
-        grid_device:led(x, y, TRIG_LEVEL)
-      elseif x-1 == playpos then
-        grid_device:led(x, y, PLAYPOS_LEVEL)
-      else
-        grid_device:led(x, y, CLEAR_LEVEL)
-      end
-    end
-    if refresh then
-      grid_device:refresh()
-    end
-  end
-end
-
-local function refresh_grid_column(x, refresh)
-  if grid_device then
-    for y=1,HEIGHT do
-      refresh_grid_button(x, y, false)
-    end
-    if refresh then
-      grid_device:refresh()
-    end
-  end
-end
-
-local function refresh_grid()
-  if grid_device then
-    for x=1,MAXWIDTH do
-      refresh_grid_column(x, false)
-    end
-    grid_device:refresh()
-  end
-end
-
 local function is_even(number)
   return number % 2 == 0
-end
-
-local function cutting_is_enabled()
-  return params:get("last_row_cuts") == 2
 end
 
 local function tick()
@@ -190,8 +202,8 @@ local function tick()
     if playpos ~= -1 then
       refresh_grid_column(playpos+1)
     end
-    if grid_device then
-      grid_device:refresh()
+    if grid.device then
+      grid:refresh()
     end
     if is_even(playpos) then
       ticks_to_next = even_ppqn
@@ -205,7 +217,7 @@ local function tick()
 end
 
 local function update_metro_time()
-  timer.time = 60/params:get("tempo")/ppqn/params:get("beats_per_pattern")
+  sequencer_metro.time = 60/params:get("tempo")/ppqn/params:get("beats_per_pattern")
 end
 
 local function update_swing(swing_amount)
@@ -222,25 +234,11 @@ local function gridkey_event(x, y, state)
       set_trig(params:get("pattern"), x, y, not trig_is_set(params:get("pattern"), x, y))
       refresh_grid_button(x, y, true)
     end
-    if grid_device then
-      grid_device:refresh()
+    if grid.device then
+      grid:refresh()
     end
   end
   redraw()
-end
-
-function grid.add(dev)
-  if not grid_device then
-    dev.key = gridkey_event
-    if gridwidth ~= dev.cols then
-      gridwidth = dev.cols
-    end
-    dev.remove = function()
-      grid_device = nil
-    end
-    grid_device = dev
-    refresh_grid()
-  end
 end
 
 function init()
@@ -251,9 +249,6 @@ function init()
       end
     end
   end
-
-  timer = metro.init()
-  timer.event = tick
 
   params:add {
     type="number",
@@ -310,7 +305,17 @@ function init()
   }
 
   params:add_separator()
+
   Ack.add_params()
+
+  grid.key = gridkey_event
+
+  refresh_ui_metro = metro.init()
+  refresh_ui_metro.event = refresh_ui
+  refresh_ui_metro.time = 1/60
+
+  sequencer_metro = metro.init()
+  sequencer_metro.event = tick
 
   update_metro_time()
 
@@ -319,10 +324,14 @@ function init()
   params:bang()
 
   playing = true
-  timer:start()
+
+  refresh_ui_metro:start()
+  sequencer_metro:start()
 end
 
 function cleanup()
+  refresh_ui_metro:stop()
+  sequencer_metro:stop()
   if grid_device then
     grid_device:all(0)
     grid_device:refresh()
@@ -351,11 +360,11 @@ function key(n, s)
       refresh_grid()
     else
       playing = false
-      timer:stop()
+      sequencer_metro:stop()
     end
   elseif n == 3 and s == 1 then
     playing = true
-    timer:start()
+    sequencer_metro:start()
   end
   redraw()
 end
