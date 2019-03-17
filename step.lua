@@ -15,8 +15,8 @@
 
 engine.name = 'Ack'
 
+local Ack = require 'we/lib/ack'
 local ControlSpec = require 'controlspec'
-local Ack = require 'ack'
 
 local PSET = "step.pset"
 local PATTERN_FILE = "step.data"
