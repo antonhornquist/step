@@ -133,7 +133,8 @@ local function refresh_ui()
 end
 
 local function save_patterns()
-  local fd=io.open(data_dir .. PATTERN_FILE,"w+") -- TODO: where is data dir pointing at?
+  print(norns.state.data)
+  local fd=io.open(norns.state.data .. PATTERN_FILE,"w+")
   io.output(fd)
   for patternno=1,NUM_PATTERNS do
     for y=1,HEIGHT do
@@ -152,7 +153,8 @@ local function save_patterns()
 end
 
 local function load_patterns()
-  local fd=io.open(data_dir .. PATTERN_FILE,"r") -- TODO: where is data dir pointing at?
+  print(norns.state.data)
+  local fd=io.open(norns.state.data .. PATTERN_FILE,"r")
   if fd then
     print("found datafile")
     io.input(fd)
@@ -330,14 +332,15 @@ function init()
 end
 
 function cleanup()
-  refresh_ui_metro:stop()
-  sequencer_metro:stop()
-  if grid_device then
-    grid_device:all(0)
-    grid_device:refresh()
-  end
-  params:write(PSET)
   save_patterns()
+  print(12414312)
+  params:write(PSET)
+  -- refresh_ui_metro:stop()
+  -- sequencer_metro:stop()
+  if grid.device then
+    grid:all(0)
+    grid:refresh()
+  end
 end
 
 function enc(n, delta)
