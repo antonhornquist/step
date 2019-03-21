@@ -420,37 +420,122 @@ function key(n, s)
   redraw()
 end
 
+--[[
 function redraw()
   screen.font_size(8)
   screen.clear()
+
   screen.level(15)
-  screen.move(10,30)
+  screen.move(2, 10)
+  screen.text(mix:string("output"))
+  screen.level(3)
+  screen.move(2, 20)
+  screen.text("level")
+
+  screen.level(15)
+  screen.move(25, 35)
+  screen.text(params:string("tempo"))
+  screen.move(80, 35)
+  screen.text(params:string("swing_amount"))
+  screen.level(3)
+  screen.move(25, 45)
+  screen.text("tempo")
+  screen.move(80, 45)
+  screen.text("swing")
+
+  screen.level(15)
+  screen.move(5, 60)
   if playing then
     screen.level(3)
-    screen.text("[] stop")
+    screen.text("stop")
   else
     screen.level(15)
-    screen.text("[] stopped")
+    screen.text("stopped")
   end
-  screen.font_size(8)
-  screen.move(70,30)
+  screen.move(70, 60)
   if playing then
     screen.level(15)
-    screen.text("|> playing")
+    screen.text("playing")
     screen.text(" "..playpos+1)
   else
     screen.level(3)
-    screen.text("|> play")
+    screen.text("play")
   end
-  screen.level(15)
-  screen.move(10,50)
-  screen.text(params:string("tempo"))
-  screen.move(70,50)
-  screen.text(params:string("swing_amount"))
-  screen.level(3)
-  screen.move(10,60)
-  screen.text("tempo")
-  screen.move(70,60)
-  screen.text("swing")
+
+  screen.update()
+end
+]]
+
+function redraw()
+  local hi_level = 15
+  local lo_level = 4
+
+  local show_level = true
+
+  local enc1_x = 0
+  local enc1_y = 10
+
+  local enc2_x = 15
+  local enc2_y = 31
+
+  local enc3_x = enc2_x+45
+  local enc3_y = enc2_y
+
+  local key2_x = 0
+  local key2_y = 63
+
+  local key3_x = key2_x+45
+  local key3_y = key2_y
+
+  screen.font_size(16)
+  screen.clear()
+
+  if show_level then
+    screen.move(enc1_x, enc1_y)
+    screen.level(lo_level)
+    screen.text("LEVEL")
+    screen.move(enc1_x+45, enc1_y)
+    screen.level(hi_level)
+    screen.text(util.round(mix:get_raw("output")*100, 1))
+  end
+
+  screen.move(enc2_x, enc2_y)
+  screen.level(lo_level)
+  screen.text("BPM")
+  screen.move(enc2_x, enc2_y+12)
+  screen.level(hi_level)
+  screen.text(util.round(params:get("tempo"), 1))
+
+  screen.move(enc3_x, enc3_y)
+  screen.level(lo_level)
+  screen.text("SWING")
+  screen.move(enc3_x, enc3_y+12)
+  screen.level(hi_level)
+  screen.text(util.round(params:get("swing_amount"), 1))
+  screen.text("%")
+
+  screen.move(key2_x, key2_y)
+  if playing then
+    screen.level(lo_level)
+  else
+    screen.level(hi_level)
+  end
+  screen.text("STOP")
+
+  screen.move(key3_x, key3_y)
+
+  if playing then
+    screen.level(hi_level)
+  else
+    screen.level(lo_level)
+  end
+  screen.text("PLAY")
+
+  if playing then
+    screen.move(key3_x+44, key3_y)
+    screen.level(hi_level)
+    screen.text(playpos+1)
+  end
+
   screen.update()
 end
