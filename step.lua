@@ -18,15 +18,21 @@ engine.name = 'Ack'
 local Ack = require 'we/lib/ack'
 local ControlSpec = require 'controlspec'
 
-local PSET = "step.pset"
 local PATTERN_FILE = "step.data"
 
 local TRIG_LEVEL = 15
 local PLAYPOS_LEVEL = 7
 local CLEAR_LEVEL = 0
 
+local screen_dirty = false
+
+local arc = arc.connect()
+local arc_connected = false
+local arc_dirty = false
+
 local grid = grid.connect()
 local grid_connected = false
+local grid_dirty = false
 
 local tempo_spec = ControlSpec.new(20, 300, ControlSpec.WARP_LIN, 0, 120, "BPM")
 local swing_amount_spec = ControlSpec.new(0, 100, ControlSpec.WARP_LIN, 0, 0, "%")
@@ -94,6 +100,15 @@ local function refresh_grid_column(x, refresh)
   end
 end
 
+local function refresh_arc()
+  if arc.device then
+    arc:all(0)
+    arc:led(1, util.round(params:get_raw("tempo")*64), 15)
+    arc:led(2, util.round(params:get_raw("swing_amount")*64), 15)
+    arc:refresh()
+  end
+end
+
 local function refresh_grid()
   if grid.device then
     for x=1,MAXWIDTH do
@@ -104,21 +119,6 @@ local function refresh_grid()
 end
 
 local function refresh_ui()
-  local redraw_screen = false
-  local grid_dirty = false
-
-  --[[ TODO
-  local arc_check = arc.device ~= nil
-  if arc_connected ~= arc_check then
-    arc_connected = arc_check
-    redraw_screen = true
-  end
-  ]]
-
-  if redraw_screen then
-    redraw()
-  end
-
   if grid.device then
     if gridwidth ~= grid.cols then
       gridwidth = grid.cols
@@ -126,14 +126,34 @@ local function refresh_ui()
     end
   end
 
+  local grid_check = grid.device ~= nil
+  if grid_connected ~= grid_check then
+    grid_connected = grid_check
+    grid_dirty = true
+  end
+
+  local arc_check = arc.device ~= nil
+  if arc_connected ~= arc_check then
+    arc_connected = arc_check
+    arc_dirty = true
+  end
+
   if grid_dirty then
     refresh_grid()
     grid_dirty = false
   end
+
+  if arc_dirty then
+    refresh_arc()
+    arc_dirty = false
+  end
+
+  if screen_dirty then
+    redraw()
+  end
 end
 
 local function save_patterns()
-  print(norns.state.data)
   local fd=io.open(norns.state.data .. PATTERN_FILE,"w+")
   io.output(fd)
   for patternno=1,NUM_PATTERNS do
@@ -153,7 +173,6 @@ local function save_patterns()
 end
 
 local function load_patterns()
-  print(norns.state.data)
   local fd=io.open(norns.state.data .. PATTERN_FILE,"r")
   if fd then
     print("found datafile")
@@ -228,21 +247,6 @@ local function update_swing(swing_amount)
   odd_ppqn = util.round(ppqn-swing_ppqn)
 end
 
-local function gridkey_event(x, y, state)
-  if state == 1 then
-    if cutting_is_enabled() and y == 8 then
-      queued_playpos = x-1
-    else
-      set_trig(params:get("pattern"), x, y, not trig_is_set(params:get("pattern"), x, y))
-      refresh_grid_button(x, y, true)
-    end
-    if grid.device then
-      grid:refresh()
-    end
-  end
-  redraw()
-end
-
 function init()
   for patternno=1,NUM_PATTERNS do
     for x=1,MAXWIDTH do
@@ -259,7 +263,9 @@ function init()
     min=1,
     max=NUM_PATTERNS,
     default=1,
-    action=refresh_grid
+    action=function()
+      grid_dirty = true
+    end
   }
 
   params:add {
@@ -267,8 +273,7 @@ function init()
     id="last_row_cuts",
     name="Last Row Cuts",
     options={"no", "yes"},
-    default=1,
-    action=refresh_grid
+    default=1
   }
 
   params:add {
@@ -276,8 +281,7 @@ function init()
     id="cut_quant",
     name="Quantize Cutting",
     options={"no", "yes"},
-    default=1,
-    action=refresh_grid
+    default=1
   }
 
   params:add {
@@ -295,7 +299,11 @@ function init()
     id="tempo",
     name="Tempo",
     controlspec=tempo_spec,
-    action=update_metro_time
+    action=function(val)
+      update_metro_time(val)
+      screen_dirty = true
+      arc_dirty = true
+    end
   }
 
   params:add {
@@ -303,14 +311,50 @@ function init()
     id="swing_amount",
     name="Swing Amount",
     controlspec=swing_amount_spec,
-    action=update_swing
+    action=function(val)
+      update_swing(val)
+      screen_dirty = true
+      arc_dirty = true
+    end
   }
 
   params:add_separator()
 
   Ack.add_params()
 
-  grid.key = gridkey_event
+  arc.delta = function(n, delta)
+    if n == 1 then
+      local val = params:get_raw("tempo")
+      params:set_raw("tempo", val+delta/500)
+      screen_dirty = true
+      arc_dirty = true
+    elseif n == 2 then
+      local val = params:get_raw("swing_amount")
+      params:set_raw("swing_amount", val+delta/500)
+      screen_dirty = true
+      arc_dirty = true
+    end
+  end
+
+  grid.key = function(x, y, state)
+    if state == 1 then
+      if cutting_is_enabled() and y == 8 then
+        queued_playpos = x-1
+      else
+        set_trig(
+          params:get("pattern"),
+          x,
+          y,
+          not trig_is_set(params:get("pattern"), x, y)
+        )
+        refresh_grid_button(x, y, true)
+      end
+      if grid.device then
+        grid:refresh()
+      end
+    end
+    redraw()
+  end
 
   refresh_ui_metro = metro.init()
   refresh_ui_metro.event = refresh_ui
@@ -321,8 +365,10 @@ function init()
 
   update_metro_time()
 
+  params:read(1)
+
   load_patterns()
-  params:read(PSET)
+
   params:bang()
 
   playing = true
@@ -332,11 +378,13 @@ function init()
 end
 
 function cleanup()
+  params:write(1)
+
   save_patterns()
-  print(12414312)
-  params:write(PSET)
-  -- refresh_ui_metro:stop()
-  -- sequencer_metro:stop()
+
+  refresh_ui_metro:stop()
+  sequencer_metro:stop()
+
   if grid.device then
     grid:all(0)
     grid:refresh()
