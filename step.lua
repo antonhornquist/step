@@ -420,52 +420,6 @@ function key(n, s)
   redraw()
 end
 
---[[
-function redraw()
-  screen.font_size(8)
-  screen.clear()
-
-  screen.level(15)
-  screen.move(2, 10)
-  screen.text(mix:string("output"))
-  screen.level(3)
-  screen.move(2, 20)
-  screen.text("level")
-
-  screen.level(15)
-  screen.move(25, 35)
-  screen.text(params:string("tempo"))
-  screen.move(80, 35)
-  screen.text(params:string("swing_amount"))
-  screen.level(3)
-  screen.move(25, 45)
-  screen.text("tempo")
-  screen.move(80, 45)
-  screen.text("swing")
-
-  screen.level(15)
-  screen.move(5, 60)
-  if playing then
-    screen.level(3)
-    screen.text("stop")
-  else
-    screen.level(15)
-    screen.text("stopped")
-  end
-  screen.move(70, 60)
-  if playing then
-    screen.level(15)
-    screen.text("playing")
-    screen.text(" "..playpos+1)
-  else
-    screen.level(3)
-    screen.text("play")
-  end
-
-  screen.update()
-end
-]]
-
 function redraw()
   local hi_level = 15
   local lo_level = 4
@@ -473,10 +427,10 @@ function redraw()
   local show_level = true
 
   local enc1_x = 0
-  local enc1_y = 10
+  local enc1_y = 12
 
-  local enc2_x = 15
-  local enc2_y = 31
+  local enc2_x = 16
+  local enc2_y = 32
 
   local enc3_x = enc2_x+45
   local enc3_y = enc2_y
@@ -497,6 +451,7 @@ function redraw()
     screen.move(enc1_x+45, enc1_y)
     screen.level(hi_level)
     screen.text(util.round(mix:get_raw("output")*100, 1))
+    --screen.text(util.round(mix:get("output"), 1).."dB")
   end
 
   screen.move(enc2_x, enc2_y)
