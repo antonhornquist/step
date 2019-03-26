@@ -365,7 +365,7 @@ function init()
 
   update_metro_time()
 
-  params:read(1)
+  params:read()
 
   load_patterns()
 
@@ -378,7 +378,7 @@ function init()
 end
 
 function cleanup()
-  params:write(1)
+  params:write()
 
   save_patterns()
 
