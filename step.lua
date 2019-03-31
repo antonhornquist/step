@@ -1,17 +1,5 @@
--- STEP
---
--- sample based step sequencer
--- controlled by grid
--- 
--- key2 = stop sequencer
--- key3 = play sequencer
---
--- enc1 = main out level
--- enc2 = tempo
--- enc3 = swing amount
--- 
--- grid = edit trigs
--- 
+-- scriptname: step
+-- v1.1.0 @jah
 
 engine.name = 'Ack'
 
@@ -26,21 +14,21 @@ local CLEAR_LEVEL = 0
 
 local screen_dirty = false
 
-local arc = arc.connect()
+local my_arc = arc.connect()
 local arc_connected = false
 local arc_dirty = false
 
-local grid = grid.connect()
+local my_grid = grid.connect()
 local grid_connected = false
 local grid_dirty = false
 
-local tempo_spec = ControlSpec.new(20, 300, ControlSpec.WARP_LIN, 0, 120, "BPM")
+local tempo_spec = ControlSpec.new(20, 500, ControlSpec.WARP_LIN, 0, 120, "BPM")
 local swing_amount_spec = ControlSpec.new(0, 100, ControlSpec.WARP_LIN, 0, 0, "%")
 
 local NUM_PATTERNS = 99
-local MAXWIDTH = 16
+local MAX_GRID_WIDTH = 16
 local HEIGHT = 8
-local gridwidth = MAXWIDTH
+local grid_width = MAX_GRID_WIDTH
 local playing = false
 local queued_playpos
 local playpos = -1
@@ -59,85 +47,79 @@ local function cutting_is_enabled()
 end
 
 local function set_trig(patternno, x, y, value)
-  trigs[patternno*MAXWIDTH*HEIGHT + y*MAXWIDTH + x] = value
+  trigs[patternno*MAX_GRID_WIDTH*HEIGHT + y*MAX_GRID_WIDTH + x] = value
 end
 
 local function trig_is_set(patternno, x, y)
-  return trigs[patternno*MAXWIDTH*HEIGHT + y*MAXWIDTH + x]
+  return trigs[patternno*MAX_GRID_WIDTH*HEIGHT + y*MAX_GRID_WIDTH + x]
 end
 
-local function refresh_grid_button(x, y, refresh)
-  if grid.device then
-    if cutting_is_enabled() and y == 8 then
-      if x-1 == playpos then
-        grid:led(x, y, PLAYPOS_LEVEL)
-      else
-        grid:led(x, y, CLEAR_LEVEL)
-      end
+local function refresh_grid_button(x, y)
+  if cutting_is_enabled() and y == 8 then
+    if x-1 == playpos then
+      my_grid:led(x, y, PLAYPOS_LEVEL)
     else
-      if trig_is_set(params:get("pattern"), x, y) then
-        grid:led(x, y, TRIG_LEVEL)
-      elseif x-1 == playpos then
-        grid:led(x, y, PLAYPOS_LEVEL)
-      else
-        grid:led(x, y, CLEAR_LEVEL)
-      end
+      my_grid:led(x, y, CLEAR_LEVEL)
     end
-    if refresh then
-      grid:refresh()
-    end
-  end
-end
-
-local function refresh_grid_column(x, refresh)
-  if grid.device then
-    for y=1,HEIGHT do
-      refresh_grid_button(x, y, false)
-    end
-    if refresh then
-      grid:refresh()
+  else
+    if trig_is_set(params:get("pattern"), x, y) then
+      my_grid:led(x, y, TRIG_LEVEL)
+    elseif x-1 == playpos then
+      my_grid:led(x, y, PLAYPOS_LEVEL)
+    else
+      my_grid:led(x, y, CLEAR_LEVEL)
     end
   end
 end
 
-local function refresh_arc()
-  if arc.device then
-    arc:all(0)
-    arc:led(1, util.round(params:get_raw("tempo")*64), 15)
-    arc:led(2, util.round(params:get_raw("swing_amount")*64), 15)
-    arc:refresh()
+local function refresh_grid_column(x)
+  for y=1,HEIGHT do
+    refresh_grid_button(x, y)
   end
 end
 
 local function refresh_grid()
-  if grid.device then
-    for x=1,MAXWIDTH do
-      refresh_grid_column(x, false)
-    end
-    grid:refresh()
+  for x=1,MAX_GRID_WIDTH do
+    refresh_grid_column(x)
+  end
+  my_grid:refresh()
+end
+
+local function refresh_arc()
+  my_arc:all(0)
+  my_arc:led(1, util.round(params:get_raw("tempo")*64), 15)
+  my_arc:led(2, util.round(params:get_raw("swing_amount")*64), 15)
+  my_arc:refresh()
+end
+
+local function update_grid_width()
+  if grid_width ~= my_grid.cols then
+    grid_width = my_grid.cols
+    grid_dirty = true
   end
 end
 
-local function refresh_ui()
-  if grid.device then
-    if gridwidth ~= grid.cols then
-      gridwidth = grid.cols
-      grid_dirty = true
-    end
-  end
-
-  local grid_check = grid.device ~= nil
+local function update_grid_connected()
+  local grid_check = my_grid.device ~= nil
   if grid_connected ~= grid_check then
     grid_connected = grid_check
     grid_dirty = true
   end
+end
 
-  local arc_check = arc.device ~= nil
+local function update_arc_connected()
+  local arc_check = my_arc.device ~= nil
   if arc_connected ~= arc_check then
     arc_connected = arc_check
     arc_dirty = true
   end
+end
 
+local function refresh_ui()
+  update_grid_width()
+  update_grid_connected()
+  update_arc_connected()
+  
   if grid_dirty then
     refresh_grid()
     grid_dirty = false
@@ -158,7 +140,7 @@ local function save_patterns()
   io.output(fd)
   for patternno=1,NUM_PATTERNS do
     for y=1,HEIGHT do
-      for x=1,MAXWIDTH do
+      for x=1,MAX_GRID_WIDTH do
         local int
         if trig_is_set(patternno, x, y) then
           int = 1
@@ -179,7 +161,7 @@ local function load_patterns()
     io.input(fd)
     for patternno=1,NUM_PATTERNS do
       for y=1,HEIGHT do
-        for x=1,MAXWIDTH do
+        for x=1,MAX_GRID_WIDTH do
           set_trig(patternno, x, y, tonumber(io.read()) == 1)
         end
       end   
@@ -205,7 +187,7 @@ local function tick()
       playpos = queued_playpos
       queued_playpos = nil
     else
-      playpos = (playpos + 1) % gridwidth
+      playpos = (playpos + 1) % grid_width
     end
     local ts = {}
     for y=1,8 do
@@ -218,20 +200,17 @@ local function tick()
     engine.multiTrig(ts[1], ts[2], ts[3], ts[4], ts[5], ts[6], ts[7], ts[8])
 
     if previous_playpos ~= -1 then
-      refresh_grid_column(previous_playpos+1)
+      grid_dirty = true
     end
     if playpos ~= -1 then
-      refresh_grid_column(playpos+1)
-    end
-    if grid.device then
-      grid:refresh()
+      grid_dirty = true
     end
     if is_even(playpos) then
       ticks_to_next = even_ppqn
     else
       ticks_to_next = odd_ppqn
     end
-    redraw()
+    screen_dirty = true
   else
     ticks_to_next = ticks_to_next - 1
   end
@@ -249,7 +228,7 @@ end
 
 function init()
   for patternno=1,NUM_PATTERNS do
-    for x=1,MAXWIDTH do
+    for x=1,MAX_GRID_WIDTH do
       for y=1,HEIGHT do
         set_trig(patternno, x, y, false)
       end
@@ -322,24 +301,21 @@ function init()
 
   Ack.add_params()
 
-  arc.delta = function(n, delta)
+  my_arc.delta = function(n, delta)
     if n == 1 then
       local val = params:get_raw("tempo")
       params:set_raw("tempo", val+delta/500)
-      screen_dirty = true
-      arc_dirty = true
     elseif n == 2 then
       local val = params:get_raw("swing_amount")
       params:set_raw("swing_amount", val+delta/500)
-      screen_dirty = true
-      arc_dirty = true
     end
   end
 
-  grid.key = function(x, y, state)
+  my_grid.key = function(x, y, state)
     if state == 1 then
       if cutting_is_enabled() and y == 8 then
         queued_playpos = x-1
+        screen_dirty = true
       else
         set_trig(
           params:get("pattern"),
@@ -347,13 +323,9 @@ function init()
           y,
           not trig_is_set(params:get("pattern"), x, y)
         )
-        refresh_grid_button(x, y, true)
-      end
-      if grid.device then
-        grid:refresh()
+        grid_dirty = true
       end
     end
-    redraw()
   end
 
   refresh_ui_metro = metro.init()
@@ -385,21 +357,21 @@ function cleanup()
   refresh_ui_metro:stop()
   sequencer_metro:stop()
 
-  if grid.device then
-    grid:all(0)
-    grid:refresh()
+  if my_grid.device then
+    my_grid:all(0)
+    my_grid:refresh()
   end
 end
 
 function enc(n, delta)
   if n == 1 then
     mix:delta("output", delta)
+    screen_dirty = true
   elseif n == 2 then
     params:delta("tempo", delta)
   elseif n == 3 then
     params:delta("swing_amount", delta)
   end
-  redraw()
 end
 
 function key(n, s)
@@ -407,8 +379,8 @@ function key(n, s)
     if playing == false then
       playpos = -1
       queued_playpos = 0
-      redraw()
-      refresh_grid()
+      grid_dirty = true
+      screen_dirty = true
     else
       playing = false
       sequencer_metro:stop()
@@ -423,8 +395,6 @@ end
 function redraw()
   local hi_level = 15
   local lo_level = 4
-
-  local show_level = true
 
   local enc1_x = 0
   local enc1_y = 12
@@ -444,15 +414,12 @@ function redraw()
   screen.font_size(16)
   screen.clear()
 
-  if show_level then
-    screen.move(enc1_x, enc1_y)
-    screen.level(lo_level)
-    screen.text("LEVEL")
-    screen.move(enc1_x+45, enc1_y)
-    screen.level(hi_level)
-    screen.text(util.round(mix:get_raw("output")*100, 1))
-    --screen.text(util.round(mix:get("output"), 1).."dB")
-  end
+  screen.move(enc1_x, enc1_y)
+  screen.level(lo_level)
+  screen.text("LEVEL")
+  screen.move(enc1_x+45, enc1_y)
+  screen.level(hi_level)
+  screen.text(util.round(mix:get_raw("output")*100, 1))
 
   screen.move(enc2_x, enc2_y)
   screen.level(lo_level)
