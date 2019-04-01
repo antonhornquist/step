@@ -14,13 +14,12 @@ local CLEAR_LEVEL = 0
 
 local screen_dirty = false
 
-local my_arc = arc.connect()
 local arc_connected = false
 local arc_dirty = false
 
-local my_grid = grid.connect()
 local grid_connected = false
 local grid_dirty = false
+local grid_width = MAX_GRID_WIDTH
 
 local tempo_spec = ControlSpec.new(20, 500, ControlSpec.WARP_LIN, 0, 120, "BPM")
 local swing_amount_spec = ControlSpec.new(0, 100, ControlSpec.WARP_LIN, 0, 0, "%")
@@ -28,7 +27,6 @@ local swing_amount_spec = ControlSpec.new(0, 100, ControlSpec.WARP_LIN, 0, 0, "%
 local NUM_PATTERNS = 99
 local MAX_GRID_WIDTH = 16
 local HEIGHT = 8
-local grid_width = MAX_GRID_WIDTH
 local playing = false
 local queued_playpos
 local playpos = -1
@@ -52,6 +50,16 @@ end
 
 local function trig_is_set(patternno, x, y)
   return trigs[patternno*MAX_GRID_WIDTH*HEIGHT + y*MAX_GRID_WIDTH + x]
+end
+
+local function init_trigs()
+  for patternno=1,NUM_PATTERNS do
+    for x=1,MAX_GRID_WIDTH do
+      for y=1,HEIGHT do
+        set_trig(patternno, x, y, false)
+      end
+    end
+  end
 end
 
 local function refresh_grid_button(x, y)
@@ -216,7 +224,7 @@ local function tick()
   end
 end
 
-local function update_metro_time()
+local function update_sequencer_metro_time()
   sequencer_metro.time = 60/params:get("tempo")/ppqn/params:get("beats_per_pattern")
 end
 
@@ -226,15 +234,54 @@ local function update_swing(swing_amount)
   odd_ppqn = util.round(ppqn-swing_ppqn)
 end
 
-function init()
-  for patternno=1,NUM_PATTERNS do
-    for x=1,MAX_GRID_WIDTH do
-      for y=1,HEIGHT do
-        set_trig(patternno, x, y, false)
+local function init_refresh_ui_metro()
+  refresh_ui_metro = metro.init()
+  refresh_ui_metro.event = refresh_ui
+  refresh_ui_metro.time = 1/60
+  refresh_ui_metro:start()
+end
+
+local function init_sequencer_metro()
+  sequencer_metro = metro.init()
+  update_sequencer_metro_time()
+  sequencer_metro.event = tick
+  sequencer_metro:start()
+end
+
+local function init_grid()
+  my_grid = grid.connect()
+  my_grid.key = function(x, y, state)
+    if state == 1 then
+      if cutting_is_enabled() and y == 8 then
+        queued_playpos = x-1
+        screen_dirty = true
+      else
+        set_trig(
+          params:get("pattern"),
+          x,
+          y,
+          not trig_is_set(params:get("pattern"), x, y)
+        )
+        grid_dirty = true
       end
     end
   end
+end
 
+local function init_arc()
+  my_arc = arc.connect()
+  my_arc.delta = function(n, delta)
+    if n == 1 then
+      local val = params:get_raw("tempo")
+      params:set_raw("tempo", val+delta/500)
+    elseif n == 2 then
+      local val = params:get_raw("swing_amount")
+      params:set_raw("swing_amount", val+delta/500)
+    end
+  end
+end
+
+local function init_params()
   params:add {
     type="number",
     id="pattern",
@@ -270,7 +317,7 @@ function init()
     min=1,
     max=8,
     default=4,
-    action=update_metro_time
+    action=update_sequencer_metro_time
   }
 
   params:add {
@@ -279,7 +326,7 @@ function init()
     name="Tempo",
     controlspec=tempo_spec,
     action=function(val)
-      update_metro_time(val)
+      update_sequencer_metro_time(val)
       screen_dirty = true
       arc_dirty = true
     end
@@ -301,52 +348,22 @@ function init()
 
   Ack.add_params()
 
-  my_arc.delta = function(n, delta)
-    if n == 1 then
-      local val = params:get_raw("tempo")
-      params:set_raw("tempo", val+delta/500)
-    elseif n == 2 then
-      local val = params:get_raw("swing_amount")
-      params:set_raw("swing_amount", val+delta/500)
-    end
-  end
-
-  my_grid.key = function(x, y, state)
-    if state == 1 then
-      if cutting_is_enabled() and y == 8 then
-        queued_playpos = x-1
-        screen_dirty = true
-      else
-        set_trig(
-          params:get("pattern"),
-          x,
-          y,
-          not trig_is_set(params:get("pattern"), x, y)
-        )
-        grid_dirty = true
-      end
-    end
-  end
-
-  refresh_ui_metro = metro.init()
-  refresh_ui_metro.event = refresh_ui
-  refresh_ui_metro.time = 1/60
-
-  sequencer_metro = metro.init()
-  sequencer_metro.event = tick
-
-  update_metro_time()
-
   params:read()
+  params:bang()
+end
+
+function init()
+  init_trigs()
+  init_grid()
+  init_arc()
+  init_params()
 
   load_patterns()
 
-  params:bang()
-
   playing = true
 
-  refresh_ui_metro:start()
-  sequencer_metro:start()
+  init_refresh_ui_metro()
+  init_sequencer_metro()
 end
 
 function cleanup()
@@ -354,8 +371,8 @@ function cleanup()
 
   save_patterns()
 
-  refresh_ui_metro:stop()
-  sequencer_metro:stop()
+  refresh_ui_metro:stop() -- TODO: probably not needed?
+  sequencer_metro:stop() -- TODO: probably not needed?
 
   if my_grid.device then
     my_grid:all(0)
@@ -392,42 +409,43 @@ function key(n, s)
   redraw()
 end
 
-function redraw()
-  local hi_level = 15
-  local lo_level = 4
+local hi_level = 15
+local lo_level = 4
 
-  local enc1_x = 0
-  local enc1_y = 12
+local enc1_x = 0
+local enc1_y = 12
 
-  local enc2_x = 16
-  local enc2_y = 32
+local enc2_x = 16
+local enc2_y = 32
 
-  local enc3_x = enc2_x+45
-  local enc3_y = enc2_y
+local enc3_x = enc2_x+45
+local enc3_y = enc2_y
 
-  local key2_x = 0
-  local key2_y = 63
+local key2_x = 0
+local key2_y = 63
 
-  local key3_x = key2_x+45
-  local key3_y = key2_y
+local key3_x = key2_x+45
+local key3_y = key2_y
 
-  screen.font_size(16)
-  screen.clear()
-
+local function redraw_enc1_widget()
   screen.move(enc1_x, enc1_y)
   screen.level(lo_level)
   screen.text("LEVEL")
   screen.move(enc1_x+45, enc1_y)
   screen.level(hi_level)
   screen.text(util.round(mix:get_raw("output")*100, 1))
+end
 
+local function redraw_enc2_widget()
   screen.move(enc2_x, enc2_y)
   screen.level(lo_level)
   screen.text("BPM")
   screen.move(enc2_x, enc2_y+12)
   screen.level(hi_level)
   screen.text(util.round(params:get("tempo"), 1))
+end
 
+local function redraw_enc3_widget()
   screen.move(enc3_x, enc3_y)
   screen.level(lo_level)
   screen.text("SWING")
@@ -435,7 +453,9 @@ function redraw()
   screen.level(hi_level)
   screen.text(util.round(params:get("swing_amount"), 1))
   screen.text("%")
+end
 
+local function redraw_key2_widget()
   screen.move(key2_x, key2_y)
   if playing then
     screen.level(lo_level)
@@ -443,9 +463,10 @@ function redraw()
     screen.level(hi_level)
   end
   screen.text("STOP")
+end
 
+local function redraw_key3_widget()
   screen.move(key3_x, key3_y)
-
   if playing then
     screen.level(hi_level)
   else
@@ -458,6 +479,17 @@ function redraw()
     screen.level(hi_level)
     screen.text(playpos+1)
   end
+end
+
+function redraw()
+  screen.font_size(16)
+  screen.clear()
+
+  redraw_enc1_widget()
+  redraw_enc2_widget()
+  redraw_enc3_widget()
+  redraw_key2_widget()
+  redraw_key3_widget()
 
   screen.update()
 end
