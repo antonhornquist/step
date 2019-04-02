@@ -6,6 +6,10 @@ engine.name = 'Ack'
 local Ack = require 'we/lib/ack'
 local ControlSpec = require 'controlspec'
 
+local NUM_PATTERNS = 99
+local MAX_GRID_WIDTH = 16
+local HEIGHT = 8
+
 local PATTERN_FILE = "step.data"
 
 local TRIG_LEVEL = 15
@@ -16,17 +20,16 @@ local screen_dirty = false
 
 local arc_connected = false
 local arc_dirty = false
+local my_arc
 
 local grid_connected = false
 local grid_dirty = false
 local grid_width = MAX_GRID_WIDTH
+local my_grid
 
-local tempo_spec = ControlSpec.new(20, 500, ControlSpec.WARP_LIN, 0, 120, "BPM")
+local tempo_spec = ControlSpec.new(20, 300, ControlSpec.WARP_LIN, 0, 120, "BPM")
 local swing_amount_spec = ControlSpec.new(0, 100, ControlSpec.WARP_LIN, 0, 0, "%")
 
-local NUM_PATTERNS = 99
-local MAX_GRID_WIDTH = 16
-local HEIGHT = 8
 local playing = false
 local queued_playpos
 local playpos = -1
@@ -101,7 +104,7 @@ local function refresh_arc()
 end
 
 local function update_grid_width()
-  if grid_width ~= my_grid.cols then
+  if my_grid.device and grid_width ~= my_grid.cols then
     grid_width = my_grid.cols
     grid_dirty = true
   end
@@ -238,14 +241,12 @@ local function init_refresh_ui_metro()
   refresh_ui_metro = metro.init()
   refresh_ui_metro.event = refresh_ui
   refresh_ui_metro.time = 1/60
-  refresh_ui_metro:start()
 end
 
 local function init_sequencer_metro()
   sequencer_metro = metro.init()
   update_sequencer_metro_time()
   sequencer_metro.event = tick
-  sequencer_metro:start()
 end
 
 local function init_grid()
@@ -347,23 +348,28 @@ local function init_params()
   params:add_separator()
 
   Ack.add_params()
-
-  params:read()
-  params:bang()
 end
 
 function init()
   init_trigs()
   init_grid()
   init_arc()
+
   init_params()
+
+  init_sequencer_metro()
+  init_refresh_ui_metro()
 
   load_patterns()
 
+  params:read()
+  params:bang()
+
+  refresh_ui_metro:start()
+
   playing = true
 
-  init_refresh_ui_metro()
-  init_sequencer_metro()
+  sequencer_metro:start()
 end
 
 function cleanup()
