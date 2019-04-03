@@ -377,9 +377,6 @@ function cleanup()
 
   save_patterns()
 
-  refresh_ui_metro:stop() -- TODO: probably not needed?
-  sequencer_metro:stop() -- TODO: probably not needed?
-
   if my_grid.device then
     my_grid:all(0)
     my_grid:refresh()
