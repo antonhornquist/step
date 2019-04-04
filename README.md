@@ -13,15 +13,15 @@ Sample based, grid controlled step sequencer
 
 ## Operation
 
-![](step.png)
+![screenshot](step.png)
 
-- ENC1 adjusts main output level.
-- ENC2 changes tempo (20-300 BPM).
-- ENC3 changes swing amount (0-100%).
-- KEY2 stops sequencer.
-- KEY3 starts sequencer.
-- GRID toggles trigs.
-- ARC changes tempo (ENC1) and swing amount (ENC2) .
+- `ENC1` adjusts main output level.
+- `ENC2` changes tempo (20-300 BPM).
+- `ENC3` changes swing amount (0-100%).
+- `KEY2` stops sequencer.
+- `KEY3` starts sequencer.
+- `GRID` toggles trigs.
+- `ARC` changes tempo (`ENC1`) and swing amount (`ENC2`).
 
 ## Grid Support
 
@@ -33,16 +33,16 @@ Step provides optional support for arc. It currently only uses the first two enc
 
 ## Options
 
-Options are available in the MENU > PARAMETERS list.
+Options are available in the global parameters list.
 
 Script options:
 
 - `Patterns` - 1..99. Selects which pattern to edit and play.
-- `Last Row Cuts` - yes or no. If yes row 8 will cut playhead position.
-- `Quantize Cutting` - yes or no. If yes playhead position cutting will be quantized to one step.
+- `Last Row Cuts` - Yes or No. If yes row 8 will cut playhead position.
+- `Quantize Cutting` - Yes or No. If yes playhead position cutting will be quantized to one step.
 - `Beats Per Pattern` - 1..8.
 - `Tempo` - 20-300 BPM.
 - `Swing Amount` - amount to swing odd steps (0-100%).
 
-The script exposes Ack engine parameters for each channel.
+The script exposes `Ack` engine parameters for each channel.
 

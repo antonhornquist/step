@@ -299,7 +299,7 @@ local function init_params()
     type="option",
     id="last_row_cuts",
     name="Last Row Cuts",
-    options={"no", "yes"},
+    options={"No", "Yes"},
     default=1
   }
 
@@ -307,7 +307,7 @@ local function init_params()
     type="option",
     id="cut_quant",
     name="Quantize Cutting",
-    options={"no", "yes"},
+    options={"No", "Yes"},
     default=1
   }
 
