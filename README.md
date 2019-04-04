@@ -15,7 +15,7 @@ Sample based, grid controlled step sequencer
 
 ![](step.png)
 
-- ENC1 adjusts volume.
+- ENC1 adjusts main output level.
 - ENC2 changes tempo (20-300 BPM).
 - ENC3 changes swing amount (0-100%).
 - KEY2 stops sequencer.
@@ -26,6 +26,10 @@ Sample based, grid controlled step sequencer
 ## Grid Support
 
 Step is designed for varibright grids. It utilizes 8 rows and 8 or 16 columns of buttons.
+
+## Arc Support
+
+Step provides optional support for arc. It currently only uses the first two encoders for control of tempo and swing.
 
 ## Options
 
