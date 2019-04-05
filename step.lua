@@ -3,7 +3,7 @@
 
 engine.name = 'Ack'
 
-local Ack = require 'we/lib/ack'
+local Ack = require 'ack/lib/ack'
 local ControlSpec = require 'controlspec'
 
 local NUM_PATTERNS = 99
