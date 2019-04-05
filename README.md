@@ -13,7 +13,7 @@ Sample based, grid controlled step sequencer
 
 ## Operation
 
-![screenshot](step.png)
+![screenshot](screen.png)
 
 - `ENC1` adjusts main output level.
 - `ENC2` changes tempo (20-300 BPM).
