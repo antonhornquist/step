@@ -37,6 +37,7 @@ Options are available in the global parameters list.
 
 Script options:
 
+- `Pattern Length` - 8 or 16. Pattern length is automatically changed to connected grid's width.
 - `Patterns` - 1..99. Selects which pattern to edit and play.
 - `Last Row Cuts` - Yes or No. If yes row 8 will cut playhead position.
 - `Quantize Cutting` - Yes or No. If yes playhead position cutting will be quantized to one step.

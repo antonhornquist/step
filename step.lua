@@ -24,7 +24,6 @@ local my_arc
 
 local grid_connected = false
 local grid_dirty = false
-local grid_width = MAX_GRID_WIDTH
 local my_grid
 
 local tempo_spec = ControlSpec.new(20, 300, ControlSpec.WARP_LIN, 0, 120, "BPM")
@@ -104,8 +103,17 @@ local function refresh_arc()
 end
 
 local function update_grid_width()
-  if my_grid.device and grid_width ~= my_grid.cols then
-    grid_width = my_grid.cols
+  local pattern_length
+  pattern_length = params:get("pattern_length")
+
+  if my_grid.device and pattern_length ~= my_grid.cols then
+    local new_pattern_length
+    if my_grid.cols == 8 then
+      new_pattern_length = 1
+    else
+      new_pattern_length = 2
+    end
+    params:set("pattern_length", new_pattern_length)
     grid_dirty = true
   end
 end
@@ -198,7 +206,9 @@ local function tick()
       playpos = queued_playpos
       queued_playpos = nil
     else
-      playpos = (playpos + 1) % grid_width
+      local pattern_length
+      pattern_length = params:get("pattern_length")
+      playpos = (playpos + 1) % pattern_length
     end
     local ts = {}
     for y=1,8 do
@@ -283,6 +293,13 @@ local function init_arc()
 end
 
 local function init_params()
+  params:add {
+    type="number",
+    id="pattern_length",
+    name="Pattern Length",
+    options={8, MAX_GRID_WIDTH},
+    default=MAX_GRID_WIDTH
+  }
   params:add {
     type="number",
     id="pattern",
