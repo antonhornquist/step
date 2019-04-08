@@ -102,18 +102,27 @@ local function refresh_arc()
   my_arc:refresh()
 end
 
-local function update_grid_width()
-  local pattern_length
-  pattern_length = params:get("pattern_length")
+local function get_pattern_length()
+  if params:get("pattern_length") == 1 then
+    return 8
+  else
+    return 16
+  end
+end
 
-  if my_grid.device and pattern_length ~= my_grid.cols then
-    local new_pattern_length
-    if my_grid.cols == 8 then
-      new_pattern_length = 1
-    else
-      new_pattern_length = 2
-    end
-    params:set("pattern_length", new_pattern_length)
+local function set_pattern_length(pattern_length)
+  local opt
+  if pattern_length == 8 then
+    opt = 1
+  else
+    opt = 2
+  end
+  params:set("pattern_length", opt)
+end
+
+local function update_grid_width()
+  if my_grid.device and get_pattern_length() ~= my_grid.cols then
+    set_pattern_length(my_grid.cols)
     grid_dirty = true
   end
 end
@@ -206,9 +215,7 @@ local function tick()
       playpos = queued_playpos
       queued_playpos = nil
     else
-      local pattern_length
-      pattern_length = params:get("pattern_length")
-      playpos = (playpos + 1) % pattern_length
+      playpos = (playpos + 1) % get_pattern_length()
     end
     local ts = {}
     for y=1,8 do
@@ -300,6 +307,7 @@ local function init_params()
     options={8, MAX_GRID_WIDTH},
     default=MAX_GRID_WIDTH
   }
+
   params:add {
     type="number",
     id="pattern",
