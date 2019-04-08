@@ -301,7 +301,7 @@ end
 
 local function init_params()
   params:add {
-    type="number",
+    type="option",
     id="pattern_length",
     name="Pattern Length",
     options={8, MAX_GRID_WIDTH},
