@@ -239,9 +239,8 @@ local function tick()
       ticks_to_next = odd_ppqn
     end
     screen_dirty = true
-  else
-    ticks_to_next = ticks_to_next - 1
   end
+  ticks_to_next = ticks_to_next - 1
 end
 
 local function update_sequencer_metro_time()
