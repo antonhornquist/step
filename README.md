@@ -45,5 +45,5 @@ Script options:
 - `Tempo` - 20-300 BPM.
 - `Swing Amount` - amount to swing odd steps (0-100%).
 
-The script exposes `Ack` engine parameters for each channel.
+The script exposes [`Ack` engine parameters for each channel](https://github.com/antonhornquist/ack/blob/master/README.md#default-parameters).
 

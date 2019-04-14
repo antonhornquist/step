@@ -35,7 +35,6 @@ local playpos = -1
 local sequencer_metro
 
 local ppqn = 24 
-local ticks
 local ticks_to_next
 local odd_ppqn
 local even_ppqn
@@ -203,8 +202,6 @@ local function is_even(number)
 end
 
 local function tick()
-  ticks = (ticks or -1) + 1
-
   if queued_playpos and params:get("cut_quant") == 1 then
     ticks_to_next = 0
   end
