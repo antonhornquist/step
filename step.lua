@@ -1,9 +1,11 @@
 -- scriptname: step
--- v1.1.1 @jah
+-- v1.1.2 @jah
 
 engine.name = 'Ack'
 
 local Ack = require 'ack/lib/ack'
+local UI = require 'step/lib/ui'
+
 local ControlSpec = require 'controlspec'
 
 local NUM_PATTERNS = 99
