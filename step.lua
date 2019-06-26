@@ -321,88 +321,7 @@ function init()
       my_arc:led(2, util.round(params:get_raw("swing_amount")*64), 15)
     end,
     screen_refresh_callback = function()
-      local hi_level = 15
-      local lo_level = 4
-
-      local enc1_x = 0
-      local enc1_y = 12
-
-      local enc2_x = 16
-      local enc2_y = 32
-
-      local enc3_x = enc2_x+45
-      local enc3_y = enc2_y
-
-      local key2_x = 0
-      local key2_y = 63
-
-      local key3_x = key2_x+45
-      local key3_y = key2_y
-
-      local function redraw_enc1_widget()
-        screen.move(enc1_x, enc1_y)
-        screen.level(lo_level)
-        screen.text("LEVEL")
-        screen.move(enc1_x+45, enc1_y)
-        screen.level(hi_level)
-        screen.text(util.round(mix:get_raw("output")*100, 1))
-      end
-
-      local function redraw_enc2_widget()
-        screen.move(enc2_x, enc2_y)
-        screen.level(lo_level)
-        screen.text("BPM")
-        screen.move(enc2_x, enc2_y+12)
-        screen.level(hi_level)
-        screen.text(util.round(params:get("tempo"), 1))
-      end
-
-      local function redraw_enc3_widget()
-        screen.move(enc3_x, enc3_y)
-        screen.level(lo_level)
-        screen.text("SWING")
-        screen.move(enc3_x, enc3_y+12)
-        screen.level(hi_level)
-        screen.text(util.round(params:get("swing_amount"), 1))
-        screen.text("%")
-      end
-
-      local function redraw_key2_widget()
-        screen.move(key2_x, key2_y)
-        if playing then
-          screen.level(lo_level)
-        else
-          screen.level(hi_level)
-        end
-        screen.text("STOP")
-      end
-
-      local function redraw_key3_widget()
-        screen.move(key3_x, key3_y)
-        if playing then
-          screen.level(hi_level)
-        else
-          screen.level(lo_level)
-        end
-        screen.text("PLAY")
-
-        if playing then
-          screen.move(key3_x+44, key3_y)
-          screen.level(hi_level)
-          screen.text(playpos+1)
-        end
-      end
-
-      screen.font_size(16)
-      screen.clear()
-
-      redraw_enc1_widget()
-      redraw_enc2_widget()
-      redraw_enc3_widget()
-      redraw_key2_widget()
-      redraw_key3_widget()
-
-      screen.update() -- TODO
+      redraw()
     end
   }
 --[[
@@ -430,6 +349,91 @@ function cleanup()
     my_grid:all(0)
     my_grid:refresh()
   end
+end
+
+function redraw()
+  local hi_level = 15
+  local lo_level = 4
+
+  local enc1_x = 0
+  local enc1_y = 12
+
+  local enc2_x = 16
+  local enc2_y = 32
+
+  local enc3_x = enc2_x+45
+  local enc3_y = enc2_y
+
+  local key2_x = 0
+  local key2_y = 63
+
+  local key3_x = key2_x+45
+  local key3_y = key2_y
+
+  local function redraw_enc1_widget()
+    screen.move(enc1_x, enc1_y)
+    screen.level(lo_level)
+    screen.text("LEVEL")
+    screen.move(enc1_x+45, enc1_y)
+    screen.level(hi_level)
+    screen.text(util.round(mix:get_raw("output")*100, 1))
+  end
+
+  local function redraw_enc2_widget()
+    screen.move(enc2_x, enc2_y)
+    screen.level(lo_level)
+    screen.text("BPM")
+    screen.move(enc2_x, enc2_y+12)
+    screen.level(hi_level)
+    screen.text(util.round(params:get("tempo"), 1))
+  end
+
+  local function redraw_enc3_widget()
+    screen.move(enc3_x, enc3_y)
+    screen.level(lo_level)
+    screen.text("SWING")
+    screen.move(enc3_x, enc3_y+12)
+    screen.level(hi_level)
+    screen.text(util.round(params:get("swing_amount"), 1))
+    screen.text("%")
+  end
+
+  local function redraw_key2_widget()
+    screen.move(key2_x, key2_y)
+    if playing then
+      screen.level(lo_level)
+    else
+      screen.level(hi_level)
+    end
+    screen.text("STOP")
+  end
+
+  local function redraw_key3_widget()
+    screen.move(key3_x, key3_y)
+    if playing then
+      screen.level(hi_level)
+    else
+      screen.level(lo_level)
+    end
+    screen.text("PLAY")
+
+    if playing then
+      screen.move(key3_x+44, key3_y)
+      screen.level(hi_level)
+      screen.text(playpos+1)
+    end
+  end
+
+  screen.font_size(16)
+  screen.clear()
+
+  redraw_enc1_widget()
+  redraw_enc2_widget()
+  redraw_enc3_widget()
+  redraw_key2_widget()
+  redraw_key3_widget()
+
+  screen.update()
 end
 
 function enc(n, delta)
