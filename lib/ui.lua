@@ -1,15 +1,15 @@
--- utility library for single-grid, single-arc, single-midi device script UIs
--- prerequisites: metro, midi, arc, grid globals defined
+-- small utility library for single-grid, single-arc, single-midi device script UIs
+-- written to track dirty states of UI, provide a generic refresh function
+-- written to not be directly dependent on norns global variables
 
 local UI = {}
 
 -- refresh logic
 
-local function tick()
-  UI.update_arc_connected()
-  UI.update_grid_width()
-  UI.update_grid_connected()
+function UI.refresh()
   UI.update_event_indicator()
+
+  UI.check_arc_connected()
     
   if UI.arc_dirty then
     if UI.refresh_arc_callback then
@@ -19,6 +19,9 @@ local function tick()
     UI.arc_dirty = false
   end
 
+  UI.check_grid_connected()
+  UI.update_grid_width()
+
   if UI.grid_dirty then
     if UI.refresh_grid_callback then
       UI.refresh_grid_callback(UI.my_grid)
@@ -26,6 +29,8 @@ local function tick()
     UI.my_grid:refresh()
     UI.grid_dirty = false
   end
+
+  UI.check_midi_connected()
 
   if UI.screen_dirty then
     if UI.refresh_screen_callback then
@@ -36,43 +41,33 @@ local function tick()
   end
 end
 
-function UI.init(rate)
-  UI.refresh_metro = metro.init()
-  UI.refresh_metro.event = tick
-  UI.refresh_metro.time = 1/(rate or 60)
-  UI.refresh_metro:start()
-end
-
-function UI.setup(config)
-  UI.setup_midi(config.midi_event_callback)
-  UI.setup_grid(config.grid_key_callback, config.grid_refresh_callback)
-  UI.setup_arc(config.arc_delta_callback, config.arc_refresh_callback)
-  UI.setup_screen(config.screen_refresh_callback)
-
-  UI.init()
+function UI.set_dirty()
+  UI.arc_dirty = true
+  UI.grid_dirty = true
+  UI.screen_dirty = true
 end
 
 -- event flash
 
-local EVENT_FLASH_LENGTH = 10
+local EVENT_FLASH_FRAMES = 10
 UI.show_event_indicator = false
-local event_flash_counter = nil
+local event_flash_frame_counter = nil
 
 function UI.flash_event()
-  event_flash_counter = EVENT_FLASH_LENGTH
+  event_flash_frame_counter = EVENT_FLASH_FRAMES
 end
   
 function UI.update_event_indicator()
-  if event_flash_counter then
-    event_flash_counter = event_flash_counter - 1
-    if event_flash_counter == 0 then
-      event_flash_counter = nil
+  if event_flash_frame_counter then
+    event_flash_frame_counter = event_flash_frame_counter - 1
+    if event_flash_frame_counter == 0 then
+      event_flash_frame_counter = nil
       UI.show_event_indicator = false
-      UI.set_screen_dirty()
+      UI.screen_dirty = true -- TODO: hmmm, should this be here? indicator assumed to be on screen, why not grid?
     else
       if not UI.show_event_indicator then
         UI.show_event_indicator = true
-        UI.set_screen_dirty()
+        UI.screen_dirty = true -- TODO: hmmm, should this be here? indicator assumed to be on screen, why not grid?
       end
     end
   end
@@ -83,22 +78,18 @@ end
 UI.arc_connected = false
 UI.arc_dirty = false
 
-function UI.set_arc_dirty()
-  UI.arc_dirty = true
-end
-
-function UI.setup_arc(delta_callback, refresh_callback)
-  local my_arc = arc.connect()
-  my_arc.delta = delta_callback
+function UI.init_arc(config)
+  local my_arc = config.device
+  my_arc.delta = config.delta_callback
   UI.my_arc = my_arc
-  UI.refresh_arc_callback = refresh_callback
+  UI.refresh_arc_callback = config.refresh_callback
 end
 
-function UI.update_arc_connected()
+function UI.check_arc_connected()
   local arc_check = UI.my_arc.device ~= nil
   if UI.arc_connected ~= arc_check then
     UI.arc_connected = arc_check
-    UI.set_arc_dirty()
+    UI.arc_dirty = true
   end
 end
   
@@ -108,22 +99,18 @@ UI.grid_connected = false
 UI.grid_dirty = false
 UI.grid_width = 16
 
-function UI.set_grid_dirty()
-  UI.grid_dirty = true
-end
-
-function UI.setup_grid(key_callback, refresh_callback)
-  local my_grid = grid.connect()
-  my_grid.key = key_callback
+function UI.init_grid(config)
+  local my_grid = config.device
+  my_grid.key = config.key_callback
   UI.my_grid = my_grid
-  UI.refresh_grid_callback = refresh_callback
+  UI.refresh_grid_callback = config.refresh_callback
 end
 
 function UI.update_grid_width()
   if UI.my_grid.device then
     if UI.grid_width ~= UI.my_grid.cols then
       UI.grid_width = UI.my_grid.cols
-      UI.set_grid_dirty()
+      UI.grid_dirty = true
       if UI.grid_width_changed_callback then
         UI.grid_width_changed_callback(UI.grid_width)
       end
@@ -131,30 +118,33 @@ function UI.update_grid_width()
   end
 end
 
-function UI.update_grid_connected()
+function UI.check_grid_connected()
   local grid_check = UI.my_grid.device ~= nil
   if UI.grid_connected ~= grid_check then
     UI.grid_connected = grid_check
-    UI.set_grid_dirty()
+    UI.grid_dirty = true
   end
 end
 
 -- midi
 
-function UI.setup_midi(event_callback)
-  local my_midi_device = midi.connect()
-  my_midi_device.event = event_callback
+function UI.init_midi(config)
+  local my_midi_device = config.device
+  my_midi_device.event = config.event_callback
   UI.my_midi_device = my_midi_device
+end
+
+function UI.check_midi_connected()
+  local midi_device_check = UI.my_midi_device.device ~= nil
+  if UI.midi_device_connected ~= midi_device_check then
+    UI.midi_device_connected = midi_device_check
+  end
 end
 
 -- screen
 
-function UI.set_screen_dirty()
-  UI.screen_dirty = true
-end
-
-function UI.setup_screen(refresh_callback)
-  UI.refresh_screen_callback = refresh_callback
+function UI.init_screen(config)
+  UI.refresh_screen_callback = config.refresh_callback
 end
 
 return UI

@@ -4,7 +4,7 @@
 engine.name = 'Ack'
 
 local Ack = require 'ack/lib/ack'
-local UI = require 'step/lib/ui'
+local UI = require 'step/lib/ui2'
 
 local ControlSpec = require 'controlspec'
 
@@ -136,17 +136,17 @@ local function tick()
     engine.multiTrig(ts[1], ts[2], ts[3], ts[4], ts[5], ts[6], ts[7], ts[8])
 
     if previous_playpos ~= -1 then
-      UI.set_grid_dirty()
+      UI.grid_dirty = true
     end
     if playpos ~= -1 then
-      UI.set_grid_dirty()
+      UI.grid_dirty = true
     end
     if is_even(playpos) then
       ticks_to_next = even_ppqn
     else
       ticks_to_next = odd_ppqn
     end
-    UI.set_screen_dirty()
+    UI.screen_dirty = true
   end
   ticks_to_next = ticks_to_next - 1
 end
@@ -184,7 +184,7 @@ local function init_params()
     max=NUM_PATTERNS,
     default=1,
     action=function()
-      UI.set_grid_dirty()
+      UI.grid_dirty = true
     end
   }
 
@@ -222,8 +222,8 @@ local function init_params()
     action=function(val)
       update_sequencer_metro_time(val)
 
-      UI.set_screen_dirty()
-      UI.set_arc_dirty()
+      UI.screen_dirty = true
+      UI.arc_dirty = true
     end
   }
 
@@ -234,34 +234,52 @@ local function init_params()
     controlspec=swing_amount_spec,
     action=function(val)
       update_swing(val)
-      UI.set_screen_dirty()
-      UI.set_arc_dirty()
+      UI.screen_dirty = true
+      UI.arc_dirty = true
     end
   }
 
   params:add_separator()
 
   Ack.add_params()
-end
-
-function init()
-  init_trigs()
-
-  init_params()
-
-  init_sequencer_metro()
-
-  load_patterns()
 
   params:read()
   params:bang()
+end
 
-  UI.setup {
-    grid_key_callback = function(x, y, state)
+local function init_60_fps_ui_refresh_metro()
+  local ui_refresh_metro = metro.init()
+  ui_refresh_metro.event = UI.refresh
+  ui_refresh_metro.time = 1/60
+  ui_refresh_metro:start()
+end
+
+local function init_ui()
+  UI.init_arc {
+    device = arc.connect(),
+    delta_callback = function(n, delta)
+      if n == 1 then
+        local val = params:get_raw("tempo")
+        params:set_raw("tempo", val+delta/500)
+      elseif n == 2 then
+        local val = params:get_raw("swing_amount")
+        params:set_raw("swing_amount", val+delta/500)
+      end
+    end,
+    arc_refresh_callback = function(my_arc)
+      my_arc:all(0)
+      my_arc:led(1, util.round(params:get_raw("tempo")*64), 15)
+      my_arc:led(2, util.round(params:get_raw("swing_amount")*64), 15)
+    end
+  }
+
+  UI.init_grid {
+    device = grid.connect(),
+    key_callback = function(x, y, state)
       if state == 1 then
         if cutting_is_enabled() and y == 8 then
           queued_playpos = x-1
-          UI.set_screen_dirty()
+          UI.screen_dirty = true
         else
           set_trig(
             params:get("pattern"),
@@ -269,11 +287,11 @@ function init()
             y,
             not trig_is_set(params:get("pattern"), x, y)
           )
-          UI.set_grid_dirty()
+          UI.grid_dirty = true
         end
       end
     end,
-    grid_refresh_callback = function(my_grid)
+    refresh_callback = function(my_grid)
       local function refresh_grid_button(x, y)
         if cutting_is_enabled() and y == 8 then
           if x-1 == playpos then
@@ -305,38 +323,35 @@ function init()
       end
 
       refresh_grid()
-    end,
-    arc_delta_callback = function(n, delta)
-      if n == 1 then
-        local val = params:get_raw("tempo")
-        params:set_raw("tempo", val+delta/500)
-      elseif n == 2 then
-        local val = params:get_raw("swing_amount")
-        params:set_raw("swing_amount", val+delta/500)
-      end
-    end,
-    arc_refresh_callback = function(my_arc)
-      my_arc:all(0)
-      my_arc:led(1, util.round(params:get_raw("tempo")*64), 15)
-      my_arc:led(2, util.round(params:get_raw("swing_amount")*64), 15)
-    end,
-    screen_refresh_callback = function()
+    end
+  }
+
+  UI.init_screen {
+    refresh_callback = function() -- TODO
       redraw()
     end
   }
+
 --[[
   TODO
 local function update_grid_width()
   if my_grid.device and get_pattern_length() ~= my_grid.cols then
     set_pattern_length(my_grid.cols)
-    UI.set_grid_dirty()
+    UI.grid_dirty = true
   end
 end
 ]]
 
+  init_60_fps_ui_refresh_metro()
+end
 
+function init()
+  init_trigs()
+  init_params()
+  init_sequencer_metro()
+  load_patterns()
+  init_ui()
   playing = true
-
   sequencer_metro:start()
 end
 
@@ -439,7 +454,7 @@ end
 function enc(n, delta)
   if n == 1 then
     mix:delta("output", delta)
-    UI.set_screen_dirty()
+    UI.screen_dirty = true
   elseif n == 2 then
     params:delta("tempo", delta)
   elseif n == 3 then
@@ -452,8 +467,8 @@ function key(n, s)
     if playing == false then
       playpos = -1
       queued_playpos = 0
-      UI.set_grid_dirty()
-      UI.set_screen_dirty()
+      UI.grid_dirty = true
+      UI.screen_dirty = true
     else
       playing = false
       sequencer_metro:stop()
@@ -462,5 +477,5 @@ function key(n, s)
     playing = true
     sequencer_metro:start()
   end
-  UI.set_screen_dirty()
+  UI.screen_dirty = true
 end
