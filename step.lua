@@ -263,7 +263,7 @@ local function init_ui()
         params:set_raw("swing_amount", val+delta/500)
       end
     end,
-    arc_refresh_callback = function(my_arc)
+    refresh_callback = function(my_arc)
       my_arc:all(0)
       my_arc:led(1, util.round(params:get_raw("tempo")*64), 15)
       my_arc:led(2, util.round(params:get_raw("swing_amount")*64), 15)
