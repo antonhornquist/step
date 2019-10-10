@@ -262,6 +262,7 @@ local function init_ui()
         local val = params:get_raw("swing_amount")
         params:set_raw("swing_amount", val+delta/500)
       end
+      UI.flash_event()
     end,
     refresh_callback = function(my_arc)
       my_arc:all(0)
@@ -287,6 +288,7 @@ local function init_ui()
           UI.grid_dirty = true
         end
       end
+      UI.flash_event()
     end,
     refresh_callback = function(my_grid)
       local function refresh_grid_button(x, y)
