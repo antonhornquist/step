@@ -9,28 +9,34 @@ local UI = {}
 function UI.refresh()
   UI.update_event_indicator()
 
-  UI.check_arc_connected()
-    
-  if UI.arc_dirty then
-    if UI.refresh_arc_callback then
-      UI.refresh_arc_callback(UI.my_arc)
+  if UI.arc_inited then
+    UI.check_arc_connected()
+      
+    if UI.arc_dirty then
+      if UI.refresh_arc_callback then
+        UI.refresh_arc_callback(UI.my_arc)
+      end
+      UI.my_arc:refresh()
+      UI.arc_dirty = false
     end
-    UI.my_arc:refresh()
-    UI.arc_dirty = false
   end
 
-  UI.check_grid_connected()
-  UI.update_grid_width()
+  if UI.grid_inited then
+    UI.check_grid_connected()
+    UI.update_grid_width()
 
-  if UI.grid_dirty then
-    if UI.refresh_grid_callback then
-      UI.refresh_grid_callback(UI.my_grid)
+    if UI.grid_dirty then
+      if UI.refresh_grid_callback then
+        UI.refresh_grid_callback(UI.my_grid)
+      end
+      UI.my_grid:refresh()
+      UI.grid_dirty = false
     end
-    UI.my_grid:refresh()
-    UI.grid_dirty = false
   end
 
-  UI.check_midi_connected()
+  if UI.midi_inited then
+    UI.check_midi_connected()
+  end
 
   if UI.screen_dirty then
     if UI.refresh_screen_callback then
@@ -83,6 +89,7 @@ function UI.init_arc(config)
   my_arc.delta = config.delta_callback
   UI.my_arc = my_arc
   UI.refresh_arc_callback = config.refresh_callback
+  UI.arc_inited = true
 end
 
 function UI.check_arc_connected()
@@ -104,6 +111,7 @@ function UI.init_grid(config)
   my_grid.key = config.key_callback
   UI.my_grid = my_grid
   UI.refresh_grid_callback = config.refresh_callback
+  UI.grid_inited = true
 end
 
 function UI.update_grid_width()
@@ -132,6 +140,7 @@ function UI.init_midi(config)
   local my_midi_device = config.device
   my_midi_device.event = config.event_callback
   UI.my_midi_device = my_midi_device
+  UI.midi_inited = true
 end
 
 function UI.check_midi_connected()
