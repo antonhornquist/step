@@ -242,9 +242,6 @@ local function init_params()
   params:add_separator()
 
   Ack.add_params()
-
-  params:read()
-  params:bang()
 end
 
 local function init_60_fps_ui_refresh_metro()
@@ -346,13 +343,16 @@ end
 end
 
 function init()
-  init_sequencer_metro()
   init_trigs()
   init_params()
+  init_sequencer_metro()
   load_patterns()
   init_ui()
   playing = true
   sequencer_metro:start()
+
+  params:read()
+  params:bang()
 end
 
 function cleanup()
