@@ -346,9 +346,9 @@ end
 end
 
 function init()
+  init_sequencer_metro()
   init_trigs()
   init_params()
-  init_sequencer_metro()
   load_patterns()
   init_ui()
   playing = true
