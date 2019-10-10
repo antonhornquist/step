@@ -4,7 +4,7 @@
 engine.name = 'Ack'
 
 local Ack = require 'ack/lib/ack'
-local UI = require 'step/lib/ui2'
+local UI = require 'step/lib/ui'
 
 local ControlSpec = require 'controlspec'
 
