@@ -1,5 +1,5 @@
 -- scriptname: step
--- v1.1.3 @jah
+-- v1.1.4 @jah
 
 engine.name = 'Ack'
 
@@ -394,6 +394,12 @@ function redraw()
     screen.text(util.round(mix:get_raw("output")*100, 1))
   end
 
+  local function redraw_event_flash_widget()
+    screen.level(lo_level)
+    screen.rect(122, enc1_y-7, 5, 5)
+    screen.fill()
+  end
+
   local function redraw_enc2_widget()
     screen.move(enc2_x, enc2_y)
     screen.level(lo_level)
@@ -443,6 +449,11 @@ function redraw()
   screen.clear()
 
   redraw_enc1_widget()
+
+  if UI.show_event_indicator then
+    redraw_event_flash_widget()
+  end
+
   redraw_enc2_widget()
   redraw_enc3_widget()
   redraw_key2_widget()
