@@ -13,8 +13,8 @@ function UI.refresh()
     UI.check_arc_connected()
       
     if UI.arc_dirty then
-      if UI.refresh_arc_callback then
-        UI.refresh_arc_callback(UI.my_arc)
+      if UI.arc_refresh_callback then
+        UI.arc_refresh_callback(UI.my_arc)
       end
       UI.my_arc:refresh()
       UI.arc_dirty = false
@@ -26,8 +26,8 @@ function UI.refresh()
     UI.update_grid_width()
 
     if UI.grid_dirty then
-      if UI.refresh_grid_callback then
-        UI.refresh_grid_callback(UI.my_grid)
+      if UI.grid_refresh_callback then
+        UI.grid_refresh_callback(UI.my_grid)
       end
       UI.my_grid:refresh()
       UI.grid_dirty = false
@@ -69,11 +69,11 @@ function UI.update_event_indicator()
     if event_flash_frame_counter == 0 then
       event_flash_frame_counter = nil
       UI.show_event_indicator = false
-      UI.screen_dirty = true -- TODO: hmmm, should this be here? indicator assumed to be on screen, why not grid?
+      UI.set_dirty()
     else
       if not UI.show_event_indicator then
         UI.show_event_indicator = true
-        UI.screen_dirty = true -- TODO: hmmm, should this be here? indicator assumed to be on screen, why not grid?
+        UI.set_dirty()
       end
     end
   end
@@ -86,9 +86,13 @@ UI.arc_dirty = false
 
 function UI.init_arc(config)
   local my_arc = config.device
-  my_arc.delta = config.delta_callback
+  UI.arc_delta_callback = config.delta_callback
+  my_arc.delta = function(n, delta)
+    UI.flash_event()
+    UI.arc_delta_callback(n, delta)
+  end
   UI.my_arc = my_arc
-  UI.refresh_arc_callback = config.refresh_callback
+  UI.arc_refresh_callback = config.refresh_callback
   UI.arc_inited = true
 end
 
@@ -108,9 +112,14 @@ UI.grid_width = 16
 
 function UI.init_grid(config)
   local my_grid = config.device
-  my_grid.key = config.key_callback
+  UI.grid_key_callback = config.key_callback
+  my_grid.key = function(x, y, s)
+    UI.flash_event()
+    UI.grid_key_callback(x, y, s)
+  end
   UI.my_grid = my_grid
-  UI.refresh_grid_callback = config.refresh_callback
+  UI.grid_refresh_callback = config.refresh_callback
+  UI.grid_width_changed_callback = config.width_changed_callback
   UI.grid_inited = true
 end
 
@@ -118,7 +127,6 @@ function UI.update_grid_width()
   if UI.my_grid.device then
     if UI.grid_width ~= UI.my_grid.cols then
       UI.grid_width = UI.my_grid.cols
-      UI.grid_dirty = true
       if UI.grid_width_changed_callback then
         UI.grid_width_changed_callback(UI.grid_width)
       end
@@ -138,7 +146,11 @@ end
 
 function UI.init_midi(config)
   local my_midi_device = config.device
-  my_midi_device.event = config.event_callback
+  UI.midi_event_callback = config.event_callback
+  my_midi_device.key = function(data)
+    UI.flash_event()
+    UI.midi_event_callback(data)
+  end
   UI.my_midi_device = my_midi_device
   UI.midi_inited = true
 end

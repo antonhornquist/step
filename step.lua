@@ -95,7 +95,6 @@ end
 local function load_patterns()
   local fd=io.open(norns.state.data .. PATTERN_FILE,"r")
   if fd then
-    print("found datafile")
     io.input(fd)
     for patternno=1,NUM_PATTERNS do
       for y=1,HEIGHT do
@@ -172,8 +171,8 @@ local function init_params()
     type="option",
     id="pattern_length",
     name="Pattern Length",
-    options={8, MAX_GRID_WIDTH},
-    default=MAX_GRID_WIDTH
+    options={8, 16},
+    default=16
   }
 
   params:add {
@@ -221,7 +220,6 @@ local function init_params()
     controlspec=tempo_spec,
     action=function(val)
       update_sequencer_metro_time(val)
-
       UI.screen_dirty = true
       UI.arc_dirty = true
     end
@@ -262,7 +260,6 @@ local function init_ui()
         local val = params:get_raw("swing_amount")
         params:set_raw("swing_amount", val+delta/500)
       end
-      UI.flash_event()
     end,
     refresh_callback = function(my_arc)
       my_arc:all(0)
@@ -322,24 +319,17 @@ local function init_ui()
       end
 
       refresh_grid()
+    end,
+    width_changed_callback = function(new_width)
+      set_pattern_length(new_width)
     end
   }
 
   UI.init_screen {
-    refresh_callback = function() -- TODO
+    refresh_callback = function()
       redraw()
     end
   }
-
---[[
-  TODO
-local function update_grid_width()
-  if my_grid.device and get_pattern_length() ~= my_grid.cols then
-    set_pattern_length(my_grid.cols)
-    UI.grid_dirty = true
-  end
-end
-]]
 
   init_60_fps_ui_refresh_metro()
 end
