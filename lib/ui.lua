@@ -147,7 +147,7 @@ end
 function UI.init_midi(config)
   local my_midi_device = config.device
   UI.midi_event_callback = config.event_callback
-  my_midi_device.key = function(data)
+  my_midi_device.event = function(data)
     UI.flash_event()
     UI.midi_event_callback(data)
   end
