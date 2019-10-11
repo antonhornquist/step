@@ -108,7 +108,7 @@ end
 
 UI.grid_connected = false
 UI.grid_dirty = false
-UI.grid_width = 16
+UI.grid_width = nil
 
 function UI.init_grid(config)
   local my_grid = config.device
