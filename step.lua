@@ -1,5 +1,5 @@
 -- scriptname: step
--- v1.1.4 @jah
+-- v1.1.6 @jah
 
 engine.name = 'Ack'
 
@@ -18,8 +18,8 @@ local TRIG_LEVEL = 15
 local PLAYPOS_LEVEL = 7
 local CLEAR_LEVEL = 0
 
-local tempo_spec = ControlSpec.new(20, 300, ControlSpec.WARP_LIN, 0, 120, "BPM")
-local swing_amount_spec = ControlSpec.new(0, 100, ControlSpec.WARP_LIN, 0, 0, "%")
+local tempo_spec = ControlSpec.new(20, 300, ControlSpec.WARP_LIN, 0.1, 120, "BPM")
+local swing_amount_spec = ControlSpec.new(0, 100, ControlSpec.WARP_LIN, 0.1, 0, "%")
 
 local playing = false
 local queued_playpos
@@ -365,10 +365,10 @@ function redraw()
   local enc1_x = 0
   local enc1_y = 12
 
-  local enc2_x = 16
+  local enc2_x = 8
   local enc2_y = 32
 
-  local enc3_x = enc2_x+45
+  local enc3_x = enc2_x+50
   local enc3_y = enc2_y
 
   local key2_x = 0
@@ -398,7 +398,7 @@ function redraw()
     screen.text("BPM")
     screen.move(enc2_x, enc2_y+12)
     screen.level(hi_level)
-    screen.text(util.round(params:get("tempo"), 1))
+    screen.text(params:get("tempo"))
   end
 
   local function redraw_enc3_widget()
@@ -407,7 +407,7 @@ function redraw()
     screen.text("SWING")
     screen.move(enc3_x, enc3_y+12)
     screen.level(hi_level)
-    screen.text(util.round(params:get("swing_amount"), 1))
+    screen.text(params:get("swing_amount"))
     screen.text("%")
   end
 
