@@ -298,17 +298,17 @@ local function refresh_grid()
   local function refresh_grid_button(x, y)
     if cutting_is_enabled() and y == 8 then
       if x-1 == playpos then
-        my_grid:led(x, y, PLAYPOS_LEVEL)
+        grid_device:led(x, y, PLAYPOS_LEVEL)
       else
-        my_grid:led(x, y, CLEAR_LEVEL)
+        grid_device:led(x, y, CLEAR_LEVEL)
       end
     else
       if trig_is_set(params:get("pattern"), x, y) then
-        my_grid:led(x, y, TRIG_LEVEL)
+        grid_device:led(x, y, TRIG_LEVEL)
       elseif x-1 == playpos then
-        my_grid:led(x, y, PLAYPOS_LEVEL)
+        grid_device:led(x, y, PLAYPOS_LEVEL)
       else
-        my_grid:led(x, y, CLEAR_LEVEL)
+        grid_device:led(x, y, CLEAR_LEVEL)
       end
     end
   end
@@ -410,9 +410,9 @@ function cleanup()
 
   save_patterns()
 
-  if my_grid.device then
-    my_grid:all(0)
-    my_grid:refresh()
+  if grid_device.device then
+    grid_device:all(0)
+    grid_device:refresh()
   end
 end
 
