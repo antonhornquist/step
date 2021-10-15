@@ -420,8 +420,8 @@ function redraw()
   local hi_level = 15
   local lo_level = 4
 
-  local enc1_x = 0 -- TODO: + 1 ?
-  local enc1_y = 12 -- TODO: + 1 ?
+  local enc1_x = 1
+  local enc1_y = 13
 
   local enc2_x = 8
   local enc2_y = 32
@@ -429,8 +429,8 @@ function redraw()
   local enc3_x = enc2_x+50
   local enc3_y = enc2_y
 
-  local key2_x = 0 -- TODO: + 1 ?
-  local key2_y = 63 -- TODO: + 1 ?
+  local key2_x = 1
+  local key2_y = 64
 
   local key3_x = key2_x+45
   local key3_y = key2_y
