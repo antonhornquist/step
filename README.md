@@ -1,6 +1,3 @@
----
----
-
 # Step
 
 Sample based, grid controlled step sequencer
