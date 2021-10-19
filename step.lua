@@ -3,13 +3,20 @@
 
 engine.name = 'Ack'
 
-local Ack = require 'ack/lib/ack'
-
 local ControlSpec = require 'controlspec'
 
+local Ack = require 'ack/lib/ack'
+
+local arc_led_x_spec = ControlSpec.new(1, 64, ControlSpec.WARP_LIN, 1, 0, "")
+local arc_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
+
+local ui_dirty = false
+
+local grid_width
+
 local NUM_PATTERNS = 99
-local MAX_GRID_WIDTH = 16
-local HEIGHT = 8
+local STEPS_PER_PATTERN = 16
+local NUM_TRACKS = 8
 
 local PATTERN_FILE = "step.data"
 
@@ -32,23 +39,45 @@ local even_ppqn
 
 local trigs = {}
 
+local hi_level = 15
+local lo_level = 4
+
+local enc1_x = 1
+local enc1_y = 13
+
+local enc2_x = 8
+local enc2_y = 32
+
+local enc3_x = enc2_x+50
+local enc3_y = enc2_y
+
+local key2_x = 1
+local key2_y = 64
+
+local key3_x = key2_x+45
+local key3_y = key2_y
+
 local function cutting_is_enabled()
   return params:get("last_row_cuts") == 2
 end
 
-local function set_trig(patternno, x, y, value)
-  trigs[patternno*MAX_GRID_WIDTH*HEIGHT + y*MAX_GRID_WIDTH + x] = value
+local function get_trigs_index(patternno, stepnum, tracknum)
+    return patternno*STEPS_PER_PATTERN*NUM_TRACKS + tracknum*STEPS_PER_PATTERN + stepnum
 end
 
-local function trig_is_set(patternno, x, y)
-  return trigs[patternno*MAX_GRID_WIDTH*HEIGHT + y*MAX_GRID_WIDTH + x]
+local function set_trig(patternno, stepnum, tracknum, value)
+  trigs[get_trigs_index(patternno, stepnum, tracknum)] = value
+end
+
+local function trig_is_set(patternno, stepnum, tracknum)
+  return trigs[get_trigs_index(patternno, stepnum, tracknum)]
 end
 
 local function init_trigs()
   for patternno=1,NUM_PATTERNS do
-    for x=1,MAX_GRID_WIDTH do
-      for y=1,HEIGHT do
-        set_trig(patternno, x, y, false)
+    for stepnum=1,STEPS_PER_PATTERN do
+      for tracknum=1,NUM_TRACKS do
+        set_trig(patternno, stepnum, tracknum, false)
       end
     end
   end
@@ -76,10 +105,10 @@ local function save_patterns()
   local fd=io.open(norns.state.data .. PATTERN_FILE,"w+")
   io.output(fd)
   for patternno=1,NUM_PATTERNS do
-    for y=1,HEIGHT do
-      for x=1,MAX_GRID_WIDTH do
+    for tracknum=1,NUM_TRACKS do
+      for stepnum=1,STEPS_PER_PATTERN do
         local int
-        if trig_is_set(patternno, x, y) then
+        if trig_is_set(patternno, stepnum, tracknum) then
           int = 1
         else
           int = 0
@@ -96,9 +125,9 @@ local function load_patterns()
   if fd then
     io.input(fd)
     for patternno=1,NUM_PATTERNS do
-      for y=1,HEIGHT do
-        for x=1,MAX_GRID_WIDTH do
-          set_trig(patternno, x, y, tonumber(io.read()) == 1)
+      for tracknum=1,NUM_TRACKS do
+        for stepnum=1,STEPS_PER_PATTERN do
+          set_trig(patternno, stepnum, tracknum, tonumber(io.read()) == 1)
         end
       end   
     end
@@ -106,11 +135,11 @@ local function load_patterns()
   end
 end  
 
-local function is_even(number)
-  return number % 2 == 0
-end
-
 local function tick()
+  local function is_even(number)
+    return number % 2 == 0
+  end
+
   if queued_playpos and params:get("cut_quant") == 1 then
     ticks_to_next = 0
   end
@@ -124,11 +153,11 @@ local function tick()
     else
       playpos = (playpos + 1) % get_pattern_length()
     end
-    for y=1,HEIGHT do
-      if trig_is_set(params:get("pattern"), playpos+1, y) and not (cutting_is_enabled() and y == 8) then
-        trigs[y] = 1
+    for tracknum=1,NUM_TRACKS do
+      if trig_is_set(params:get("pattern"), playpos+1, tracknum) and not (cutting_is_enabled() and tracknum == 8) then
+        trigs[tracknum] = 1
       else
-        trigs[y] = 0
+        trigs[tracknum] = 0
       end
     end
     engine.multiTrig(trigs[1], trigs[2], trigs[3], trigs[4], trigs[5], trigs[6], trigs[7], trigs[8])
@@ -147,7 +176,7 @@ local function update_sequencer_metro_time()
   sequencer_metro.time = 60/params:get("tempo")/ppqn/params:get("beats_per_pattern")
 end
 
-local function update_swing(swing_amount)
+local function update_even_odd_ppqn(swing_amount)
   local swing_ppqn = ppqn*swing_amount/100*0.75
   even_ppqn = util.round(ppqn+swing_ppqn)
   odd_ppqn = util.round(ppqn-swing_ppqn)
@@ -237,7 +266,7 @@ local function init_swing_amount_param()
     name="Swing Amount",
     controlspec=swing_amount_spec,
     action=function(val)
-      update_swing(val)
+      update_even_odd_ppqn(val)
       ui_dirty = true
     end
   }
@@ -289,8 +318,8 @@ end
 
 local function refresh_arc()
   arc_device:all(0)
-  arc_device:led(1, util.round(params:get_raw("tempo")*64), 15)
-  arc_device:led(2, util.round(params:get_raw("swing_amount")*64), 15)
+  arc_device:led(1, arc_led_x_spec:map(params:get_raw("tempo")), arc_led_x_spec.maxval)
+  arc_device:led(2, arc_led_x_spec:map(params:get_raw("swing_amount")), arc_led_x_spec.maxval)
   arc_device:refresh()
 end
 
@@ -314,13 +343,13 @@ local function refresh_grid()
   end
 
   local function refresh_grid_column(x)
-    for y=1,HEIGHT do
-      refresh_grid_button(x, y)
+    for tracknum=1,NUM_TRACKS do
+      refresh_grid_button(x, tracknum)
     end
   end
 
-  for x=1,MAX_GRID_WIDTH do
-    refresh_grid_column(x)
+  for stepnum=1,STEPS_PER_PATTERN do
+    refresh_grid_column(stepnum)
   end
 
   grid_device:refresh()
@@ -392,6 +421,14 @@ local function init_ui()
   init_60_fps_ui_refresh_metro()
 end
 
+local function get_play_label()
+  if playing then
+    return "PLAY" .. (playpos+1)
+  else
+    return "PLAY"
+  end
+end
+
 function init()
   init_trigs()
   init_params()
@@ -416,25 +453,13 @@ function cleanup()
   end
 end
 
+function redraw_event_flash_widget()
+  screen.level(lo_level)
+  screen.rect(122, enc1_y-7, 5, 5)
+  screen.fill()
+end
+
 function redraw()
-  local hi_level = 15
-  local lo_level = 4
-
-  local enc1_x = 1
-  local enc1_y = 13
-
-  local enc2_x = 8
-  local enc2_y = 32
-
-  local enc3_x = enc2_x+50
-  local enc3_y = enc2_y
-
-  local key2_x = 1
-  local key2_y = 64
-
-  local key3_x = key2_x+45
-  local key3_y = key2_y
-
   local function redraw_enc1_widget()
     screen.move(enc1_x, enc1_y)
     screen.level(lo_level)
@@ -442,12 +467,6 @@ function redraw()
     screen.move(enc1_x+45, enc1_y)
     screen.level(hi_level)
     screen.text(util.round(params:get_raw("output_level")*100, 1))
-  end
-
-  local function redraw_event_flash_widget()
-    screen.level(lo_level)
-    screen.rect(122, enc1_y-7, 5, 5)
-    screen.fill()
   end
 
   local function redraw_enc2_widget()
@@ -465,8 +484,7 @@ function redraw()
     screen.text("SWING")
     screen.move(enc3_x, enc3_y+12)
     screen.level(hi_level)
-    screen.text(params:get("swing_amount"))
-    screen.text("%")
+    screen.text(tostring(params:get("swing_amount")) .. "%")
   end
 
   local function redraw_key2_widget()
@@ -486,13 +504,7 @@ function redraw()
     else
       screen.level(lo_level)
     end
-    screen.text("PLAY")
-
-    if playing then
-      screen.move(key3_x+44, key3_y)
-      screen.level(hi_level)
-      screen.text(playpos+1)
-    end
+    screen.text(get_play_label())
   end
 
   screen.font_size(16)
