@@ -318,8 +318,8 @@ end
 
 local function refresh_arc()
   arc_device:all(0)
-  arc_device:led(1, arc_led_x_spec:map(params:get_raw("tempo")), arc_led_x_spec.maxval)
-  arc_device:led(2, arc_led_x_spec:map(params:get_raw("swing_amount")), arc_led_x_spec.maxval)
+  arc_device:led(1, arc_led_x_spec:map(params:get_raw("tempo")), arc_led_l_spec.maxval)
+  arc_device:led(2, arc_led_x_spec:map(params:get_raw("swing_amount")), arc_led_l_spec.maxval)
   arc_device:refresh()
 end
 
