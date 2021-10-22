@@ -423,7 +423,7 @@ end
 
 local function get_play_label()
   if playing then
-    return "PLAY" .. (playpos+1)
+    return "PLAY " .. (playpos+1)
   else
     return "PLAY"
   end
