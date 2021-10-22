@@ -466,7 +466,7 @@ function redraw()
     screen.text("LEVEL")
     screen.move(enc1_x+45, enc1_y)
     screen.level(hi_level)
-    screen.text(util.round(params:get_raw("output_level")*100, 1))
+    screen.text(util.round(params:get_raw("main_level")*100, 1))
   end
 
   local function redraw_enc2_widget()
@@ -526,7 +526,7 @@ end
 
 function enc(n, delta)
   if n == 1 then
-    params:delta("output_level", delta)
+    params:delta("main_level", delta)
     ui_dirty = true
   elseif n == 2 then
     params:delta("tempo", delta)
