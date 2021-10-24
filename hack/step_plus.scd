@@ -12,7 +12,7 @@ var include_relative = { |relative_path|
 
 var ack_engine_root_relative = ".." +/+ ".." +/+ "ack" +/+ "lib";
 
-var lib_root_relative = ".." +/+ "lib";
+var lib_root_relative = "lib";
 var norns_engine_tester = include_relative.value(lib_root_relative +/+ "norns_engine_tester.scd");
 var start_script = norns_engine_tester['start_script'];
 var script_name = PathName(thisProcess.nowExecutingPath).fileNameWithoutExtension;
