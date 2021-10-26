@@ -435,7 +435,6 @@ function init()
   init_sequencer_metro()
   load_patterns()
   init_ui()
-  playing = true
   sequencer_metro:start()
 
   params:read()

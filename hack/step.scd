@@ -481,7 +481,6 @@ start_script.value(script_name) {
 		init_sequencer_metro.value();
 		load_patterns.value();
 		init_ui.value();
-		playing = true;
 		sequencer_metro.start_();
 
 		~params.set__("last_row_cuts", 2); // TODO: this is the default in sc, not in lua
