@@ -435,7 +435,6 @@ function init()
   init_sequencer_metro()
   load_patterns()
   init_ui()
-  sequencer_metro:start()
 
   params:read()
   params:bang()
