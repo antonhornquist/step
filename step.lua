@@ -5,37 +5,20 @@ local ControlSpec = require 'controlspec'
 
 local Ack = require 'ack/lib/ack'
 
-local arc_led_x_spec = ControlSpec.new(1, 64, ControlSpec.WARP_LIN, 1, 0, "")
-local arc_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
+local grid_width
 
 local ui_dirty = false
 
-local grid_width
+local refresh_rate = 60
 
-local NUM_PATTERNS = 99
-local STEPS_PER_PATTERN = 16
-local NUM_TRACKS = 8
+local event_flash_duration = 0.15
+local show_event_indicator = false
+local event_flash_frame_counter = nil
 
-local PATTERN_FILE = "step.data"
-
-local TRIG_LEVEL = 15
-local PLAYPOS_LEVEL = 7
-local CLEAR_LEVEL = 0
-
+local arc_led_x_spec = ControlSpec.new(1, 64, ControlSpec.WARP_LIN, 1, 0, "")
+local arc_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
 local tempo_spec = ControlSpec.new(20, 300, ControlSpec.WARP_LIN, 0.1, 120, "BPM")
 local swing_amount_spec = ControlSpec.new(0, 100, ControlSpec.WARP_LIN, 0.1, 0, "%")
-
-local playing = false
-local queued_playpos
-local playpos = -1
-local sequencer_metro
-
-local ppqn = 24 
-local ticks_to_next
-local odd_ppqn
-local even_ppqn
-
-local trigs = {}
 
 local hi_level = 15
 local lo_level = 4
@@ -55,6 +38,28 @@ local key2_y = 64
 local key3_x = key2_x+45
 local key3_y = key2_y
 
+local num_patterns = 99
+local steps_per_pattern = 16
+local num_tracks = 8
+
+local pattern_file = "step.data"
+
+local trig_level = 15
+local playpos_level = 7
+local clear_level = 0
+
+local playing = false
+local queued_playpos
+local playpos = -1 -- TODO ?
+local sequencer_metro
+
+local ppqn = 24 
+local ticks_to_next
+local odd_ppqn
+local even_ppqn
+
+local trigs = {}
+
 local
 cutting_is_enabled =
 function()
@@ -64,7 +69,7 @@ end
 local
 get_trigs_index =
 function(patternno, stepnum, tracknum)
-    return patternno*STEPS_PER_PATTERN*NUM_TRACKS + tracknum*STEPS_PER_PATTERN + stepnum
+    return patternno*steps_per_pattern*num_tracks + tracknum*steps_per_pattern + stepnum
 end
 
 local
@@ -82,9 +87,9 @@ end
 local
 init_trigs =
 function()
-  for patternno=1,NUM_PATTERNS do
-    for stepnum=1,STEPS_PER_PATTERN do
-      for tracknum=1,NUM_TRACKS do
+  for patternno=1,num_patterns do
+    for stepnum=1,steps_per_pattern do
+      for tracknum=1,num_tracks do
         set_trig(patternno, stepnum, tracknum, false)
       end
     end
@@ -116,11 +121,11 @@ end
 local
 save_patterns =
 function()
-  local fd=io.open(norns.state.data .. PATTERN_FILE,"w+")
+  local fd=io.open(norns.state.data .. pattern_file,"w+")
   io.output(fd)
-  for patternno=1,NUM_PATTERNS do
-    for tracknum=1,NUM_TRACKS do
-      for stepnum=1,STEPS_PER_PATTERN do
+  for patternno=1,num_patterns do
+    for tracknum=1,num_tracks do
+      for stepnum=1,steps_per_pattern do
         local int
         if trig_is_set(patternno, stepnum, tracknum) then
           int = 1
@@ -137,12 +142,12 @@ end
 local
 load_patterns =
 function()
-  local fd=io.open(norns.state.data .. PATTERN_FILE,"r")
+  local fd=io.open(norns.state.data .. pattern_file,"r")
   if fd then
     io.input(fd)
-    for patternno=1,NUM_PATTERNS do
-      for tracknum=1,NUM_TRACKS do
-        for stepnum=1,STEPS_PER_PATTERN do
+    for patternno=1,num_patterns do
+      for tracknum=1,num_tracks do
+        for stepnum=1,steps_per_pattern do
           set_trig(patternno, stepnum, tracknum, tonumber(io.read()) == 1)
         end
       end   
@@ -171,7 +176,7 @@ function()
     else
       playpos = (playpos + 1) % get_pattern_length()
     end
-    for tracknum=1,NUM_TRACKS do
+    for tracknum=1,num_tracks do
       if trig_is_set(params:get("pattern"), playpos+1, tracknum) and not (cutting_is_enabled() and tracknum == 8) then
         trigs[tracknum] = 1
       else
@@ -232,7 +237,7 @@ function()
     id="pattern",
     name="Pattern",
     min=1,
-    max=NUM_PATTERNS,
+    max=num_patterns,
     default=1,
     action=function()
       ui_dirty = true
@@ -324,13 +329,9 @@ function()
   Ack.add_params()
 end
 
-local EVENT_FLASH_FRAMES = 10 -- TODO: event_flash_duration
-local show_event_indicator = false
-local event_flash_frame_counter = nil
-
 flash_event =
 function()
-  event_flash_frame_counter = EVENT_FLASH_FRAMES
+  event_flash_frame_counter = event_flash_duration/refresh_rate
   ui_dirty = true
 end
   
@@ -359,17 +360,17 @@ function()
   function(x, y)
     if cutting_is_enabled() and y == 8 then
       if x-1 == playpos then
-        grid_device:led(x, y, PLAYPOS_LEVEL)
+        grid_device:led(x, y, playpos_level)
       else
-        grid_device:led(x, y, CLEAR_LEVEL)
+        grid_device:led(x, y, clear_level)
       end
     else
       if trig_is_set(params:get("pattern"), x, y) then
-        grid_device:led(x, y, TRIG_LEVEL)
+        grid_device:led(x, y, trig_level)
       elseif x-1 == playpos then
-        grid_device:led(x, y, PLAYPOS_LEVEL)
+        grid_device:led(x, y, playpos_level)
       else
-        grid_device:led(x, y, CLEAR_LEVEL)
+        grid_device:led(x, y, clear_level)
       end
     end
   end
@@ -377,12 +378,12 @@ function()
   local
   refresh_grid_column =
   function(x)
-    for tracknum=1,NUM_TRACKS do
+    for tracknum=1,num_tracks do
       refresh_grid_button(x, tracknum)
     end
   end
 
-  for stepnum=1,STEPS_PER_PATTERN do
+  for stepnum=1,steps_per_pattern do
     refresh_grid_column(stepnum)
   end
 

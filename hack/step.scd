@@ -26,37 +26,20 @@ var ack = include_relative.value(ack_engine_root_relative +/+ "ack.scd");
 var ack_lib = ack[\lib];
 var ack_add_params = ack_lib[\add_params];
 
-var arc_led_x_spec = ControlSpec(1, 64, 'linear', 1, 0, "");
-var arc_led_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
+var grid_width;
 
 var ui_dirty = false;
 
-var grid_width;
+var refresh_rate = 60;
 
-var num_patterns = 99;
-var steps_per_pattern = 16;
-var num_tracks = 8;
+var event_flash_duration = 0.15;
+var show_event_indicator = false;
+var event_flash_frame_counter = nil;
 
-var pattern_file = "step.data";
-
-var trig_level = 15;
-var playpos_level = 7;
-var clear_level = 0;
-
+var arc_led_x_spec = ControlSpec(1, 64, 'linear', 1, 0, "");
+var arc_led_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
 var tempo_spec = ControlSpec.new(20, 300, 'lin', 0.1, 60, "BPM");
 var swing_amount_spec = ControlSpec.new(0, 100, 'lin', 0.1, 0, "%");
-
-var playing = false;
-var queued_playpos;
-var playpos = 0;
-var sequencer_metro;
-
-var ppqn = 24;
-var ticks_to_next;
-var odd_ppqn;
-var even_ppqn;
-
-var trigs = Array.fill(num_patterns*steps_per_pattern*num_tracks);
 
 var hi_level = 15;
 var lo_level = 4;
@@ -75,6 +58,28 @@ var key2_y = 64;
 
 var key3_x = key2_x+45;
 var key3_y = key2_y;
+
+var num_patterns = 99;
+var steps_per_pattern = 16;
+var num_tracks = 8;
+
+var pattern_file = "step.data";
+
+var trig_level = 15;
+var playpos_level = 7;
+var clear_level = 0;
+
+var playing = false;
+var queued_playpos;
+var playpos = 0; // TODO: ?
+var sequencer_metro;
+
+var ppqn = 24;
+var ticks_to_next;
+var odd_ppqn;
+var even_ppqn;
+
+var trigs = Array.fill(num_patterns*steps_per_pattern*num_tracks);
 
 var
 cutting_is_enabled =
@@ -352,14 +357,11 @@ init_params =
 	ack_add_params.value();
 };
 
-var event_flash_frames = 10; // TODO: event_flash_duration
-var show_event_indicator = false;
-var event_flash_frame_counter = nil;
-
 var
 flash_event =
 {
-	event_flash_frame_counter = event_flash_frames;
+	event_flash_frame_counter = event_flash_duration/refresh_rate;
+	ui_dirty = true
 };
   
 var
@@ -465,7 +467,7 @@ init_60_fps_ui_refresh_metro =
 {
 	var ui_refresh_metro = ~metro.init_();
 	ui_refresh_metro.event = refresh_ui;
-	ui_refresh_metro.time = 1/60;
+	ui_refresh_metro.time = 1/refresh_rate;
 	ui_refresh_metro.start_();
 };
 
