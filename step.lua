@@ -559,7 +559,7 @@ function()
   local
   redraw_enc3_widget =
   function()
-    redraw_param_widget(enc2_x, enc2_y, "SWING", tostring(params:get("swing_amount")) .. "%")
+    redraw_param_widget(enc3_x, enc3_y, "SWING", tostring(params:get("swing_amount")) .. "%")
   end
 
   local
