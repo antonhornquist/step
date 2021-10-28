@@ -365,7 +365,7 @@ flash_event =
 };
   
 var
-update_event_indicator = // TODO: global in lua
+update_event_indicator =
 {
 	if (event_flash_frame_counter.notNil) {
 		event_flash_frame_counter = event_flash_frame_counter - 1;
@@ -443,7 +443,7 @@ refresh_arc =
 };
 
 var
-refresh_ui = // TODO: global in lua
+refresh_ui =
 {
 	update_event_indicator.value();
 	update_grid_width.value();
@@ -494,11 +494,9 @@ init_grid =
 {
 	~grid_device = ~grid.connect_();
 	~grid_device[\key] = { |x, y, state| // not .key notation to suppress self argument? // TODO: x, y are single character
-		flash_event.value();
 		if (state == 1) {
-			if (cutting_is_enabled.value() and: (y == 8)) { // TODO: y == 8 should be y == 7 everywhere
+			if (cutting_is_enabled.value() and: (y == 8)) {
 				queued_playpos = x;
-				ui_dirty = true; // TODO: not correct
 			} {
 				set_trig.value(
 					~params.get_("pattern"),
@@ -506,9 +504,10 @@ init_grid =
 					y,
 					trig_is_set.value(~params.get_("pattern"), x, y).not
 				);
-				ui_dirty = true;
 			}
 		};
+		flash_event.value();
+		ui_dirty = true;
 	};
 };
 
@@ -578,7 +577,7 @@ redraw =
 		~screen.text_("LEVEL");
 		~screen.move_(enc1_x+45, enc1_y);
 		~screen.level_(hi_level);
-		~screen.text_(round(~params.get_raw_("main_level") * 100, 1)); // TODO: introduce engine specific output level
+		~screen.text_(round(~params.get_raw_("main_level") * 100, 1));
 	};
 
 	var

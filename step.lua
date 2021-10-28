@@ -335,6 +335,7 @@ function()
   ui_dirty = true
 end
   
+local
 update_event_indicator =
 function()
   if event_flash_frame_counter then
@@ -409,6 +410,7 @@ function()
   arc_device:refresh()
 end
 
+local
 refresh_ui =
 function()
   update_event_indicator()
@@ -470,9 +472,9 @@ function()
           not trig_is_set(params:get("pattern"), x, y)
         )
       end
-      ui_dirty = true
     end
     flash_event()
+    ui_dirty = true
   end
 end
 
