@@ -243,113 +243,99 @@ init_sequencer_metro =
 var
 init_pattern_length_param =
 {
-	~params.add_(
-		(
-			type: "option",
-			id: "pattern_length",
-			name: "Pattern Length",
-			options: [8, 16],
-			default: 2
-		)
-	);
+	~params.add_((
+		type: "option",
+		id: "pattern_length",
+		name: "Pattern Length",
+		options: [8, 16],
+		default: 2
+	));
 };
 
 var
 init_pattern_param =
 {
-	~params.add_(
-		(
-			type: "number",
-			id: "pattern",
-			name: "Pattern",
-			min: 1,
-			max: num_patterns,
-			default: 1,
-			action: {
-				ui_dirty = true;
-			}
-		)
-	);
+	~params.add_((
+		type: "number",
+		id: "pattern",
+		name: "Pattern",
+		min: 1,
+		max: num_patterns,
+		default: 1,
+		action: {
+			ui_dirty = true;
+		}
+	));
 };
 
 var
 init_last_row_cuts_param =
 {
-	~params.add_(
-		(
-			type: "option",
-			id: "last_row_cuts",
-			name: "Last Row Cuts",
-			options: ["No", "Yes"],
-			default: 1
-		)
-	);
+	~params.add_((
+		type: "option",
+		id: "last_row_cuts",
+		name: "Last Row Cuts",
+		options: ["No", "Yes"],
+		default: 1
+	));
 };
 
 var
 init_qut_quant_param =
 {
-	~params.add_(
-		(
-			type: "option",
-			id: "cut_quant",
-			name: "Quantize Cutting",
-			options: ["No", "Yes"],
-			default: 1
-		)
-	);
+	~params.add_((
+		type: "option",
+		id: "cut_quant",
+		name: "Quantize Cutting",
+		options: ["No", "Yes"],
+		default: 1
+	));
 };
 
 var
 init_beats_per_pattern_param =
 {
-	~params.add_(
-		(
-			type: "number",
-			id: "beats_per_pattern",
-			name: "Beats Per Pattern",
-			min: 1,
-			max: 8,
-			default: 4,
-			action: {
-				update_sequencer_metro_time.value();
-			}
-		)
-	);
+	~params.add_((
+		type: "number",
+		id: "beats_per_pattern",
+		name: "Beats Per Pattern",
+		min: 1,
+		max: 8,
+		default: 4,
+		action: {
+			update_sequencer_metro_time.value();
+		}
+	));
 };
 
 var
 init_tempo_param =
 {
-	~params.add_(
-		(
-			type: "control",
-			id: "tempo",
-			name: "Tempo",
-			controlspec: tempo_spec,
-			action: {
-				update_sequencer_metro_time.value();
-				ui_dirty = true;
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "tempo",
+		name: "Tempo",
+		controlspec: tempo_spec,
+		action: {
+			update_sequencer_metro_time.value();
+			ui_dirty = true;
+		}
+	));
 };
 
 var
 init_swing_amount_param =
 {
-	~params.add_(
-		(
-			type: "control",
-			id: "swing_amount",
-			name: "Swing Amount",
-			controlspec: swing_amount_spec,
-			action: { |val|
-				update_even_odd_ppqn.value(val);
-				ui_dirty = true;
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "swing_amount",
+		name: "Swing Amount",
+		controlspec: swing_amount_spec,
+		action: { |val|
+			update_even_odd_ppqn.value(val);
+			ui_dirty = true;
+		}
+	));
 };
 
 var
@@ -366,7 +352,7 @@ init_params =
 	ack_add_params.value();
 };
 
-var event_flash_frames = 10;
+var event_flash_frames = 10; // TODO: event_flash_duration
 var show_event_indicator = false;
 var event_flash_frame_counter = nil;
 
@@ -377,7 +363,7 @@ flash_event =
 };
   
 var
-update_event_indicator =
+update_event_indicator = // TODO: global in lua
 {
 	if (event_flash_frame_counter.notNil) {
 		event_flash_frame_counter = event_flash_frame_counter - 1;
@@ -398,7 +384,8 @@ var
 refresh_grid =
 {
 	var
-	refresh_grid_button = { |x, y|
+	refresh_grid_button =
+	{ |x, y|
 		if (cutting_is_enabled.value() and: (y == 8)) {
 			if (x == playpos) {
 				~grid_device.led_(x, y, playpos_level);
@@ -420,7 +407,8 @@ refresh_grid =
 	};
 
 	var
-	refresh_grid_column = { |x|
+	refresh_grid_column =
+	{ |x|
 		(1..num_tracks).do { |y|
 			refresh_grid_button.value(x, y)
 		}
@@ -453,7 +441,7 @@ refresh_arc =
 };
 
 var
-refresh_ui =
+refresh_ui = // TODO: global in lua
 {
 	update_event_indicator.value();
 	update_grid_width.value();
@@ -553,8 +541,6 @@ init =
 	load_patterns.value();
 	init_ui.value();
 
-	~params.set__("last_row_cuts", 2); // TODO: this is the default in sc, not in lua
-
 	~params.read_();
 	~params.bang_();
 };
@@ -564,13 +550,11 @@ cleanup =
 {
 	~params.write_();
 	save_patterns.value();
-/*
-TODO
+
 	if (~grid_device.device_.notNil) {
 		~grid_device.all_(0);
 		~grid_device.refresh_();
 	};
-*/
 };
 
 ~
@@ -661,8 +645,7 @@ redraw =
 ~
 enc =
 { |n, delta|
-	case
-	{n == 1} {
+	case {n == 1} {
 		~params.delta_("main_level", delta);
 		ui_dirty = true;
 	}
@@ -677,8 +660,7 @@ enc =
 ~
 key =
 { |n, s|
-	case
-	{(n == 2) and: (s == 1)} {
+	case {(n == 2) and: (s == 1)} {
 		if (playing == false) {
 			playpos = 0;
 			queued_playpos = 1;

@@ -1,8 +1,6 @@
 -- scriptname: step
 -- v2.0.0 @jah
 
-engine.name = 'Ack'
-
 local ControlSpec = require 'controlspec'
 
 local Ack = require 'ack/lib/ack'
@@ -57,23 +55,33 @@ local key2_y = 64
 local key3_x = key2_x+45
 local key3_y = key2_y
 
-local function cutting_is_enabled()
+local
+cutting_is_enabled =
+function()
   return params:get("last_row_cuts") == 2
 end
 
-local function get_trigs_index(patternno, stepnum, tracknum)
+local
+get_trigs_index =
+function(patternno, stepnum, tracknum)
     return patternno*STEPS_PER_PATTERN*NUM_TRACKS + tracknum*STEPS_PER_PATTERN + stepnum
 end
 
-local function set_trig(patternno, stepnum, tracknum, value)
+local
+set_trig =
+function(patternno, stepnum, tracknum, value)
   trigs[get_trigs_index(patternno, stepnum, tracknum)] = value
 end
 
-local function trig_is_set(patternno, stepnum, tracknum)
+local
+trig_is_set =
+function(patternno, stepnum, tracknum)
   return trigs[get_trigs_index(patternno, stepnum, tracknum)]
 end
 
-local function init_trigs()
+local
+init_trigs =
+function()
   for patternno=1,NUM_PATTERNS do
     for stepnum=1,STEPS_PER_PATTERN do
       for tracknum=1,NUM_TRACKS do
@@ -83,7 +91,9 @@ local function init_trigs()
   end
 end
 
-local function get_pattern_length()
+local
+get_pattern_length =
+function()
   if params:get("pattern_length") == 1 then
     return 8
   else
@@ -91,7 +101,9 @@ local function get_pattern_length()
   end
 end
 
-local function set_pattern_length(pattern_length)
+local
+set_pattern_length =
+function(pattern_length)
   local opt
   if pattern_length == 8 then
     opt = 1
@@ -101,7 +113,9 @@ local function set_pattern_length(pattern_length)
   params:set("pattern_length", opt)
 end
 
-local function save_patterns()
+local
+save_patterns =
+function()
   local fd=io.open(norns.state.data .. PATTERN_FILE,"w+")
   io.output(fd)
   for patternno=1,NUM_PATTERNS do
@@ -120,7 +134,9 @@ local function save_patterns()
   io.close(fd)
 end
 
-local function load_patterns()
+local
+load_patterns =
+function()
   local fd=io.open(norns.state.data .. PATTERN_FILE,"r")
   if fd then
     io.input(fd)
@@ -135,7 +151,9 @@ local function load_patterns()
   end
 end  
 
-local function tick()
+local
+tick =
+function()
   local function is_even(number)
     return number % 2 == 0
   end
@@ -172,23 +190,31 @@ local function tick()
   ticks_to_next = ticks_to_next - 1
 end
 
-local function update_sequencer_metro_time()
+local
+update_sequencer_metro_time =
+function()
   sequencer_metro.time = 60/params:get("tempo")/ppqn/params:get("beats_per_pattern")
 end
 
-local function update_even_odd_ppqn(swing_amount)
+local
+update_even_odd_ppqn =
+function(swing_amount)
   local swing_ppqn = ppqn*swing_amount/100*0.75
   even_ppqn = util.round(ppqn+swing_ppqn)
   odd_ppqn = util.round(ppqn-swing_ppqn)
 end
 
-local function init_sequencer_metro()
+local
+init_sequencer_metro =
+function()
   sequencer_metro = metro.init()
   update_sequencer_metro_time()
   sequencer_metro.event = tick
 end
 
-local function init_pattern_length_param()
+local
+init_pattern_length_param =
+function()
   params:add {
     type="option",
     id="pattern_length",
@@ -198,7 +224,9 @@ local function init_pattern_length_param()
   }
 end
 
-local function init_pattern_param()
+local
+init_pattern_param =
+function()
   params:add {
     type="number",
     id="pattern",
@@ -212,7 +240,9 @@ local function init_pattern_param()
   }
 end
 
-local function init_last_row_cuts_param()
+local
+init_last_row_cuts_param =
+function()
   params:add {
     type="option",
     id="last_row_cuts",
@@ -222,7 +252,9 @@ local function init_last_row_cuts_param()
   }
 end
 
-local function init_cut_quant_param()
+local
+init_cut_quant_param =
+function()
   params:add {
     type="option",
     id="cut_quant",
@@ -232,7 +264,9 @@ local function init_cut_quant_param()
   }
 end
 
-local function init_beats_per_pattern()
+local
+init_beats_per_pattern =
+function()
   params:add {
     type="number",
     id="beats_per_pattern",
@@ -246,7 +280,9 @@ local function init_beats_per_pattern()
   }
 end
 
-local function init_tempo_param()
+local
+init_tempo_param =
+function()
   params:add {
     type="control",
     id="tempo",
@@ -259,7 +295,9 @@ local function init_tempo_param()
   }
 end
 
-local function init_swing_amount_param()
+local
+init_swing_amount_param =
+function()
   params:add {
     type="control",
     id="swing_amount",
@@ -272,7 +310,9 @@ local function init_swing_amount_param()
   }
 end
 
-local function init_params()
+local
+init_params =
+function()
   init_pattern_length_param()
   init_pattern_param()
   init_last_row_cuts_param()
@@ -284,15 +324,18 @@ local function init_params()
   Ack.add_params()
 end
 
-local EVENT_FLASH_FRAMES = 10
+local EVENT_FLASH_FRAMES = 10 -- TODO: event_flash_duration
 local show_event_indicator = false
 local event_flash_frame_counter = nil
 
-function flash_event()
+flash_event =
+function()
   event_flash_frame_counter = EVENT_FLASH_FRAMES
+  ui_dirty = true
 end
   
-function update_event_indicator()
+update_event_indicator =
+function()
   if event_flash_frame_counter then
     event_flash_frame_counter = event_flash_frame_counter - 1
     if event_flash_frame_counter == 0 then
@@ -308,23 +351,12 @@ function update_event_indicator()
   end
 end
 
-local function update_grid_width()
-  if grid_device.device then
-    if grid_width ~= grid_device.cols then
-      grid_width = grid_device.cols
-    end
-  end
-end
-
-local function refresh_arc()
-  arc_device:all(0)
-  arc_device:led(1, arc_led_x_spec:map(params:get_raw("tempo")), arc_led_l_spec.maxval)
-  arc_device:led(2, arc_led_x_spec:map(params:get_raw("swing_amount")), arc_led_l_spec.maxval)
-  arc_device:refresh()
-end
-
-local function refresh_grid()
-  local function refresh_grid_button(x, y)
+local
+refresh_grid =
+function()
+  local
+  refresh_grid_button =
+  function(x, y)
     if cutting_is_enabled() and y == 8 then
       if x-1 == playpos then
         grid_device:led(x, y, PLAYPOS_LEVEL)
@@ -342,7 +374,9 @@ local function refresh_grid()
     end
   end
 
-  local function refresh_grid_column(x)
+  local
+  refresh_grid_column =
+  function(x)
     for tracknum=1,NUM_TRACKS do
       refresh_grid_button(x, tracknum)
     end
@@ -355,7 +389,27 @@ local function refresh_grid()
   grid_device:refresh()
 end
 
-function refresh_ui()
+local
+update_grid_width =
+function()
+  if grid_device.device then
+    if grid_width ~= grid_device.cols then
+      grid_width = grid_device.cols
+    end
+  end
+end
+
+local
+refresh_arc =
+function()
+  arc_device:all(0)
+  arc_device:led(1, arc_led_x_spec:map(params:get_raw("tempo")), arc_led_l_spec.maxval)
+  arc_device:led(2, arc_led_x_spec:map(params:get_raw("swing_amount")), arc_led_l_spec.maxval)
+  arc_device:refresh()
+end
+
+refresh_ui =
+function()
   update_event_indicator()
   update_grid_width()
 
@@ -373,14 +427,18 @@ function refresh_ui()
   end
 end
 
-local function init_60_fps_ui_refresh_metro()
+local
+init_60_fps_ui_refresh_metro =
+function()
   local ui_refresh_metro = metro.init()
   ui_refresh_metro.event = refresh_ui
   ui_refresh_metro.time = 1/60
   ui_refresh_metro:start()
 end
 
-local function init_arc()
+local
+init_arc =
+function()
   arc_device = arc.connect()
   arc_device.delta = function(n, delta)
     if n == 1 then
@@ -395,7 +453,9 @@ local function init_arc()
   end
 end
 
-local function init_grid()
+local
+init_grid =
+function()
   grid_device = grid.connect()
   grid_device.key = function(x, y, state)
     if state == 1 then
@@ -415,13 +475,17 @@ local function init_grid()
   end
 end
 
-local function init_ui()
+local
+init_ui =
+function()
   init_arc()
   init_grid()
   init_60_fps_ui_refresh_metro()
 end
 
-local function get_play_label()
+local
+get_play_label =
+function()
   if playing then
     return "PLAY " .. (playpos+1)
   else
@@ -429,7 +493,10 @@ local function get_play_label()
   end
 end
 
-function init()
+engine.name = 'Ack'
+
+init =
+function()
   init_trigs()
   init_params()
   init_sequencer_metro()
@@ -440,9 +507,9 @@ function init()
   params:bang()
 end
 
-function cleanup()
+cleanup =
+function()
   params:write()
-
   save_patterns()
 
   if grid_device.device then
@@ -451,14 +518,18 @@ function cleanup()
   end
 end
 
-function redraw_event_flash_widget()
+redraw_event_flash_widget =
+function()
   screen.level(lo_level)
   screen.rect(122, enc1_y-7, 5, 5)
   screen.fill()
 end
 
-function redraw()
-  local function redraw_enc1_widget()
+redraw =
+function()
+  local
+  redraw_enc1_widget =
+  function()
     screen.move(enc1_x, enc1_y)
     screen.level(lo_level)
     screen.text("LEVEL")
@@ -467,25 +538,32 @@ function redraw()
     screen.text(util.round(params:get_raw("main_level")*100, 1))
   end
 
-  local function redraw_enc2_widget()
-    screen.move(enc2_x, enc2_y)
+  local
+  redraw_param_widget =
+  function(x, y, label, value)
+    screen.move(x, y)
     screen.level(lo_level)
-    screen.text("BPM")
-    screen.move(enc2_x, enc2_y+12)
+    screen.text(label)
+    screen.move(x, y+12)
     screen.level(hi_level)
-    screen.text(params:get("tempo"))
+    screen.text(value)
   end
 
-  local function redraw_enc3_widget()
-    screen.move(enc3_x, enc3_y)
-    screen.level(lo_level)
-    screen.text("SWING")
-    screen.move(enc3_x, enc3_y+12)
-    screen.level(hi_level)
-    screen.text(tostring(params:get("swing_amount")) .. "%")
+  local
+  redraw_enc2_widget =
+  function()
+    redraw_param_widget(enc2_x, enc2_y, "BPM", params:get("tempo"))
   end
 
-  local function redraw_key2_widget()
+  local
+  redraw_enc3_widget =
+  function()
+    redraw_param_widget(enc2_x, enc2_y, "SWING", tostring(params:get("swing_amount")) .. "%")
+  end
+
+  local
+  redraw_key2_widget =
+  function()
     screen.move(key2_x, key2_y)
     if playing then
       screen.level(lo_level)
@@ -495,7 +573,9 @@ function redraw()
     screen.text("STOP")
   end
 
-  local function redraw_key3_widget()
+  local
+  redraw_key3_widget =
+  function()
     screen.move(key3_x, key3_y)
     if playing then
       screen.level(hi_level)
@@ -518,11 +598,11 @@ function redraw()
   redraw_enc3_widget()
   redraw_key2_widget()
   redraw_key3_widget()
-
   screen.update()
 end
 
-function enc(n, delta)
+enc =
+function(n, delta)
   if n == 1 then
     params:delta("main_level", delta)
     ui_dirty = true
@@ -533,7 +613,8 @@ function enc(n, delta)
   end
 end
 
-function key(n, s)
+key =
+function(n, s)
   if n == 2 and s == 1 then
     if playing == false then
       playpos = -1
