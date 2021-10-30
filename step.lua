@@ -341,7 +341,7 @@ end
 local
 event_indicator_should_be_shown =
 function()
-	event_flash_frame_counter ~= nil
+	return event_flash_frame_counter ~= nil
 end
 
 local
@@ -466,7 +466,7 @@ function()
   grid_device.key = function(x, y, state)
     if state == 1 then
       if cutting_is_enabled() and y == 8 then
-        queued_playpos = x-1
+        queued_playpos = x
       else
         set_trig(
           params:get("pattern"),
