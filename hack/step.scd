@@ -1,5 +1,4 @@
 (
-// TODO: remove single character variables which won't work in SC
 var include_relative = { |relative_path|
 	var path = (PathName(thisProcess.nowExecutingPath).pathOnly +/+ relative_path).standardizePath;
 	if (File.exists(path)) {
@@ -26,14 +25,14 @@ var ack = include_relative.value(ack_engine_root_relative +/+ "ack.scd");
 var ack_lib = ack[\lib];
 var ack_add_params = ack_lib[\add_params];
 
+var prev_grid_width;
 var grid_width;
 
 var ui_dirty = false;
 
-var refresh_rate = 60;
+var refresh_rate = 35;
 
 var event_flash_duration = 0.15;
-var show_event_indicator = false;
 var event_flash_frame_counter = nil;
 
 var arc_led_x_spec = ControlSpec(1, 64, 'linear', 1, 0, "");
@@ -71,7 +70,7 @@ var clear_level = 0;
 
 var playing = false;
 var queued_playpos;
-var playpos = 0; // TODO: ?
+var playpos = 0;
 var sequencer_metro;
 
 var ppqn = 24;
@@ -286,7 +285,7 @@ init_last_row_cuts_param =
 };
 
 var
-init_qut_quant_param =
+init_cut_quant_param =
 {
 	~params.add_((
 		type: "option",
@@ -349,7 +348,7 @@ init_params =
 	init_pattern_length_param.value();
 	init_pattern_param.value();
 	init_last_row_cuts_param.value();
-	init_qut_quant_param.value();
+	init_cut_quant_param.value();
 	init_beats_per_pattern_param.value();
 	init_tempo_param.value();
 	init_swing_amount_param.value();
@@ -360,62 +359,61 @@ init_params =
 var
 flash_event =
 {
-	event_flash_frame_counter = event_flash_duration/refresh_rate;
-	ui_dirty = true
+	event_flash_frame_counter = round(event_flash_duration * refresh_rate);
 };
   
+var
+event_indicator_should_be_shown =
+{
+	event_flash_frame_counter.notNil
+};
+
 var
 update_event_indicator =
 {
 	if (event_flash_frame_counter.notNil) {
 		event_flash_frame_counter = event_flash_frame_counter - 1;
 		case
-		{ event_flash_frame_counter == 0 } {
+		{ event_flash_frame_counter <= 0 } {
 			event_flash_frame_counter = nil;
-			show_event_indicator = false;
-			ui_dirty = true;
-		}
-		{ show_event_indicator.not } {
-			show_event_indicator = true;
-			ui_dirty = true;
 		};
+		ui_dirty = true;
 	};
+};
+
+var
+refresh_grid_button =
+{ |x, y|
+	if (cutting_is_enabled.value() and: (y == 8)) {
+		if (x == playpos) {
+			~grid_device.led_(x, y, playpos_level);
+		} {
+			~grid_device.led_(x, y, clear_level);
+		};
+	} {
+		case {trig_is_set.value(~params.get_("pattern"), x, y)} {
+			~grid_device.led_(x, y, trig_level)
+		}
+		{ x == playpos } {
+			~grid_device.led_(x, y, playpos_level)
+		}
+		{ true } {
+			~grid_device.led_(x, y, clear_level)
+		}
+	}
+};
+
+var
+refresh_grid_column =
+{ |x|
+	(1..num_tracks).do { |y|
+		refresh_grid_button.value(x, y)
+	}
 };
 
 var
 refresh_grid =
 {
-	var
-	refresh_grid_button =
-	{ |x, y|
-		if (cutting_is_enabled.value() and: (y == 8)) {
-			if (x == playpos) {
-				~grid_device.led_(x, y, playpos_level);
-			} {
-				~grid_device.led_(x, y, clear_level);
-			};
-		} {
-			case
-			{trig_is_set.value(~params.get_("pattern"), x, y)} {
-				~grid_device.led_(x, y, trig_level)
-			}
-			{ x == playpos } {
-				~grid_device.led_(x, y, playpos_level)
-			}
-			{ true } {
-				~grid_device.led_(x, y, clear_level)
-			}
-		}
-	};
-
-	var
-	refresh_grid_column =
-	{ |x|
-		(1..num_tracks).do { |y|
-			refresh_grid_button.value(x, y)
-		}
-	};
-
 	(1..steps_per_pattern).do { |stepnum|
 		refresh_grid_column.value(stepnum)
 	};
@@ -448,9 +446,9 @@ refresh_ui =
 	update_event_indicator.value();
 	update_grid_width.value();
 
-	if (~prev_grid_width != grid_width) {
+	if (prev_grid_width != grid_width) {
 		set_pattern_length.value(grid_width);
-		~prev_grid_width = grid_width;
+		prev_grid_width = grid_width;
 		ui_dirty = true;
 	};
 
@@ -463,7 +461,7 @@ refresh_ui =
 };
 
 var
-init_60_fps_ui_refresh_metro =
+init_ui_refresh_metro =
 {
 	var ui_refresh_metro = ~metro.init_();
 	ui_refresh_metro.event = refresh_ui;
@@ -477,8 +475,7 @@ init_arc =
 	~arc_device = ~arc.connect_();
 	~arc_device[\delta] = { |n, delta| // not .delta notation to suppress self argument?
 		flash_event.value();
-		case
-		{n == 1} {
+		case {n == 1} {
 			var val = ~params.get_raw_("tempo");
 			~params.set_raw_("tempo", val+(delta/500));
 		}
@@ -493,7 +490,7 @@ var
 init_grid =
 {
 	~grid_device = ~grid.connect_();
-	~grid_device[\key] = { |x, y, state| // not .key notation to suppress self argument? // TODO: x, y are single character
+	~grid_device[\key] = { |x, y, state|
 		if (state == 1) {
 			if (cutting_is_enabled.value() and: (y == 8)) {
 				queued_playpos = x;
@@ -516,17 +513,83 @@ init_ui =
 {
 	init_arc.value();
 	init_grid.value();
-	init_60_fps_ui_refresh_metro.value();
+	init_ui_refresh_metro.value();
 };
 
 var
 get_play_label =
 {
 	if (playing) {
-		"PLAY " ++ playpos; // TODO: sometimes prints 0!?
+		"PLAY " ++ playpos;
 	} {
 		"PLAY";
 	};
+};
+
+var
+redraw_enc1_widget =
+{
+	~screen.move_(enc1_x, enc1_y);
+	~screen.level_(lo_level);
+	~screen.text_("LEVEL");
+	~screen.move_(enc1_x+45, enc1_y);
+	~screen.level_(hi_level);
+	~screen.text_(round(~params.get_raw_("main_level") * 100, 1));
+};
+
+var
+redraw_param_widget =
+{ |x, y, label, value|
+	~screen.move_(x, y);
+	~screen.level_(lo_level);
+	~screen.text_(label);
+	~screen.move_(x, y+12);
+	~screen.level_(hi_level);
+	~screen.text_(value);
+};
+
+var
+redraw_enc2_widget =
+{
+	redraw_param_widget.value(enc2_x, enc2_y, "BPM", ~params.get_("tempo"));
+};
+
+var
+redraw_enc3_widget =
+{
+	redraw_param_widget.value(enc3_x, enc3_y, "SWING", ~params.get_("swing_amount").asString ++ "%");
+};
+
+var
+redraw_key2_widget =
+{
+	~screen.move_(key2_x, key2_y);
+	if (playing) {
+		~screen.level_(lo_level);
+	} {
+		~screen.level_(hi_level);
+	};
+	~screen.text_("STOP");
+};
+
+var
+redraw_key3_widget =
+{
+	~screen.move_(key3_x, key3_y);
+	if (playing) {
+		~screen.level_(hi_level);
+	} {
+		~screen.level_(lo_level);
+	};
+	~screen.text_(get_play_label.value());
+};
+
+var
+redraw_event_flash_widget =
+{
+	~screen.level_(lo_level);
+	~screen.rect_(122, enc1_y-7, 5, 5);
+	~screen.fill_();
 };
 
 ~
@@ -541,7 +604,6 @@ init =
 	init_sequencer_metro.value();
 	load_patterns.value();
 	init_ui.value();
-
 	~params.read_();
 	~params.bang_();
 };
@@ -559,81 +621,15 @@ cleanup =
 };
 
 ~
-redraw_event_flash_widget =
-{
-	~screen.level_(lo_level);
-	~screen.rect_(122, enc1_y-7, 5, 5);
-	~screen.fill_();
-};
-
-~
 redraw =
 {
-	var
-	redraw_enc1_widget =
-	{
-		~screen.move_(enc1_x, enc1_y);
-		~screen.level_(lo_level);
-		~screen.text_("LEVEL");
-		~screen.move_(enc1_x+45, enc1_y);
-		~screen.level_(hi_level);
-		~screen.text_(round(~params.get_raw_("main_level") * 100, 1));
-	};
-
-	var
-	redraw_param_widget =
-	{ |x, y, label, value|
-		~screen.move_(x, y);
-		~screen.level_(lo_level);
-		~screen.text_(label);
-		~screen.move_(x, y+12);
-		~screen.level_(hi_level);
-		~screen.text_(value);
-	};
-
-	var
-	redraw_enc2_widget =
-	{
-		redraw_param_widget.value(enc2_x, enc2_y, "BPM", ~params.get_("tempo"));
-	};
-
-	var
-	redraw_enc3_widget =
-	{
-		redraw_param_widget.value(enc3_x, enc3_y, "SWING", ~params.get_("swing_amount").asString ++ "%");
-	};
-
-	var
-	redraw_key2_widget =
-	{
-		~screen.move_(key2_x, key2_y);
-		if (playing) {
-			~screen.level_(lo_level);
-		} {
-			~screen.level_(hi_level);
-		};
-		~screen.text_("STOP");
-	};
-
-	var
-	redraw_key3_widget =
-	{
-		~screen.move_(key3_x, key3_y);
-		if (playing) {
-			~screen.level_(hi_level);
-		} {
-			~screen.level_(lo_level);
-		};
-		~screen.text_(get_play_label.value());
-	};
-
 	~screen.font_size_(16);
 	~screen.clear_();
 
 	redraw_enc1_widget.value();
 
-	if (show_event_indicator) {
-		~redraw_event_flash_widget.value();
+	if (event_indicator_should_be_shown.value()) {
+		redraw_event_flash_widget.value();
 	};
 
 	redraw_enc2_widget.value();

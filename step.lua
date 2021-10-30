@@ -5,14 +5,14 @@ local ControlSpec = require 'controlspec'
 
 local Ack = require 'ack/lib/ack'
 
+local prev_grid_width
 local grid_width
 
 local ui_dirty = false
 
-local refresh_rate = 60
+local refresh_rate = 35
 
 local event_flash_duration = 0.15
-local show_event_indicator = false
 local event_flash_frame_counter = nil
 
 local arc_led_x_spec = ControlSpec.new(1, 64, ControlSpec.WARP_LIN, 1, 0, "")
@@ -50,7 +50,7 @@ local clear_level = 0
 
 local playing = false
 local queued_playpos
-local playpos = -1 -- TODO ?
+local playpos = 0
 local sequencer_metro
 
 local ppqn = 24 
@@ -174,10 +174,13 @@ function()
       playpos = queued_playpos
       queued_playpos = nil
     else
-      playpos = (playpos + 1) % get_pattern_length()
+      playpos = playpos + 1
+      if playpos > get_pattern_length() then
+        playpos = 1
+      end
     end
     for tracknum=1,num_tracks do
-      if trig_is_set(params:get("pattern"), playpos+1, tracknum) and not (cutting_is_enabled() and tracknum == 8) then
+      if trig_is_set(params:get("pattern"), playpos, tracknum) and not (cutting_is_enabled() and tracknum == 8) then
         trigs[tracknum] = 1
       else
         trigs[tracknum] = 0
@@ -205,8 +208,8 @@ local
 update_even_odd_ppqn =
 function(swing_amount)
   local swing_ppqn = ppqn*swing_amount/100*0.75
-  even_ppqn = util.round(ppqn+swing_ppqn)
-  odd_ppqn = util.round(ppqn-swing_ppqn)
+  even_ppqn = util.round(ppqn-swing_ppqn)
+  odd_ppqn = util.round(ppqn+swing_ppqn)
 end
 
 local
@@ -270,7 +273,7 @@ function()
 end
 
 local
-init_beats_per_pattern =
+init_beats_per_pattern_param =
 function()
   params:add {
     type="number",
@@ -322,68 +325,68 @@ function()
   init_pattern_param()
   init_last_row_cuts_param()
   init_cut_quant_param()
-  init_beats_per_pattern()
+  init_beats_per_pattern_param()
   init_tempo_param()
   init_swing_amount_param()
   params:add_separator()
   Ack.add_params()
 end
 
+local
 flash_event =
 function()
-  event_flash_frame_counter = event_flash_duration/refresh_rate
-  ui_dirty = true
+  event_flash_frame_counter = util.round(event_flash_duration * refresh_rate)
 end
   
 local
+event_indicator_should_be_shown =
+function()
+	event_flash_frame_counter ~= nil
+end
+
+local
 update_event_indicator =
 function()
-  if event_flash_frame_counter then
+  if event_flash_frame_counter ~= nil then
     event_flash_frame_counter = event_flash_frame_counter - 1
-    if event_flash_frame_counter == 0 then
+    if event_flash_frame_counter <= 0 then
       event_flash_frame_counter = nil
-      show_event_indicator = false
-      ui_dirty = true
-    else
-      if not show_event_indicator then
-        show_event_indicator = true
-        ui_dirty = true
-      end
     end
+    ui_dirty = true
+  end
+end
+
+local
+refresh_grid_button =
+function(x, y)
+  if cutting_is_enabled() and y == 8 then
+    if x == playpos then
+      grid_device:led(x, y, playpos_level)
+    else
+      grid_device:led(x, y, clear_level)
+    end
+  else
+    if trig_is_set(params:get("pattern"), x, y) then
+      grid_device:led(x, y, trig_level)
+    elseif x == playpos then
+      grid_device:led(x, y, playpos_level)
+    else
+      grid_device:led(x, y, clear_level)
+    end
+  end
+end
+
+local
+refresh_grid_column =
+function(x)
+  for tracknum=1,num_tracks do
+    refresh_grid_button(x, tracknum)
   end
 end
 
 local
 refresh_grid =
 function()
-  local
-  refresh_grid_button =
-  function(x, y)
-    if cutting_is_enabled() and y == 8 then
-      if x-1 == playpos then
-        grid_device:led(x, y, playpos_level)
-      else
-        grid_device:led(x, y, clear_level)
-      end
-    else
-      if trig_is_set(params:get("pattern"), x, y) then
-        grid_device:led(x, y, trig_level)
-      elseif x-1 == playpos then
-        grid_device:led(x, y, playpos_level)
-      else
-        grid_device:led(x, y, clear_level)
-      end
-    end
-  end
-
-  local
-  refresh_grid_column =
-  function(x)
-    for tracknum=1,num_tracks do
-      refresh_grid_button(x, tracknum)
-    end
-  end
-
   for stepnum=1,steps_per_pattern do
     refresh_grid_column(stepnum)
   end
@@ -431,11 +434,11 @@ function()
 end
 
 local
-init_60_fps_ui_refresh_metro =
+init_ui_refresh_metro =
 function()
   local ui_refresh_metro = metro.init()
   ui_refresh_metro.event = refresh_ui
-  ui_refresh_metro.time = 1/60
+  ui_refresh_metro.time = 1/refresh_rate
   ui_refresh_metro:start()
 end
 
@@ -483,17 +486,83 @@ init_ui =
 function()
   init_arc()
   init_grid()
-  init_60_fps_ui_refresh_metro()
+  init_ui_refresh_metro()
 end
 
 local
 get_play_label =
 function()
   if playing then
-    return "PLAY " .. (playpos+1)
+    return "PLAY " .. playpos
   else
     return "PLAY"
   end
+end
+
+local
+redraw_enc1_widget =
+function()
+  screen.move(enc1_x, enc1_y)
+  screen.level(lo_level)
+  screen.text("LEVEL")
+  screen.move(enc1_x+45, enc1_y)
+  screen.level(hi_level)
+  screen.text(util.round(params:get_raw("main_level")*100, 1))
+end
+
+local
+redraw_param_widget =
+function(x, y, label, value)
+  screen.move(x, y)
+  screen.level(lo_level)
+  screen.text(label)
+  screen.move(x, y+12)
+  screen.level(hi_level)
+  screen.text(value)
+end
+
+local
+redraw_enc2_widget =
+function()
+  redraw_param_widget(enc2_x, enc2_y, "BPM", params:get("tempo"))
+end
+
+local
+redraw_enc3_widget =
+function()
+  redraw_param_widget(enc3_x, enc3_y, "SWING", tostring(params:get("swing_amount")) .. "%")
+end
+
+local
+redraw_key2_widget =
+function()
+  screen.move(key2_x, key2_y)
+  if playing then
+    screen.level(lo_level)
+  else
+    screen.level(hi_level)
+  end
+  screen.text("STOP")
+end
+
+local
+redraw_key3_widget =
+function()
+  screen.move(key3_x, key3_y)
+  if playing then
+    screen.level(hi_level)
+  else
+    screen.level(lo_level)
+  end
+  screen.text(get_play_label())
+end
+
+local
+redraw_event_flash_widget =
+function()
+  screen.level(lo_level)
+  screen.rect(122, enc1_y-7, 5, 5)
+  screen.fill()
 end
 
 engine.name = 'Ack'
@@ -505,7 +574,6 @@ function()
   init_sequencer_metro()
   load_patterns()
   init_ui()
-
   params:read()
   params:bang()
 end
@@ -521,79 +589,14 @@ function()
   end
 end
 
-redraw_event_flash_widget =
-function()
-  screen.level(lo_level)
-  screen.rect(122, enc1_y-7, 5, 5)
-  screen.fill()
-end
-
 redraw =
 function()
-  local
-  redraw_enc1_widget =
-  function()
-    screen.move(enc1_x, enc1_y)
-    screen.level(lo_level)
-    screen.text("LEVEL")
-    screen.move(enc1_x+45, enc1_y)
-    screen.level(hi_level)
-    screen.text(util.round(params:get_raw("main_level")*100, 1))
-  end
-
-  local
-  redraw_param_widget =
-  function(x, y, label, value)
-    screen.move(x, y)
-    screen.level(lo_level)
-    screen.text(label)
-    screen.move(x, y+12)
-    screen.level(hi_level)
-    screen.text(value)
-  end
-
-  local
-  redraw_enc2_widget =
-  function()
-    redraw_param_widget(enc2_x, enc2_y, "BPM", params:get("tempo"))
-  end
-
-  local
-  redraw_enc3_widget =
-  function()
-    redraw_param_widget(enc3_x, enc3_y, "SWING", tostring(params:get("swing_amount")) .. "%")
-  end
-
-  local
-  redraw_key2_widget =
-  function()
-    screen.move(key2_x, key2_y)
-    if playing then
-      screen.level(lo_level)
-    else
-      screen.level(hi_level)
-    end
-    screen.text("STOP")
-  end
-
-  local
-  redraw_key3_widget =
-  function()
-    screen.move(key3_x, key3_y)
-    if playing then
-      screen.level(hi_level)
-    else
-      screen.level(lo_level)
-    end
-    screen.text(get_play_label())
-  end
-
   screen.font_size(16)
   screen.clear()
 
   redraw_enc1_widget()
 
-  if show_event_indicator then
+  if event_indicator_should_be_shown() then
     redraw_event_flash_widget()
   end
 
@@ -620,8 +623,8 @@ key =
 function(n, s)
   if n == 2 and s == 1 then
     if playing == false then
-      playpos = -1
-      queued_playpos = 0
+      playpos = 0
+      queued_playpos = 1
     else
       playing = false
       sequencer_metro:stop()
