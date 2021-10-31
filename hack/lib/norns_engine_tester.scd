@@ -9,6 +9,9 @@ var include_relative = { |relative_path|
 	};
 };
 
+var r_engine_root = ".." +/+ ".." +/+ ".." +/+ "r";
+var ack_engine_root = ".." +/+ ".." +/+ ".." +/+ "ack";
+
 var namespaces = ();
 
 var load_class_dynamically = { |classname|
@@ -1038,7 +1041,7 @@ namespaces.paramset = {
 
 // TODO: load on demand
 namespaces.ack_engine = {
-	var ack = include_relative.value(".." +/+ ".." +/+ ".." +/+ "ack" +/+ "lib" +/+ "ack.scd");
+	var ack = include_relative.value(ack_engine_root +/+ "lib" +/+ "ack.scd");
 
 	var init = ack[\init];
 	var free = ack[\free];
@@ -1211,7 +1214,7 @@ namespaces.ack_engine = {
 
 // TODO: load on demand
 namespaces.r_engine = {
-	var rrrr = include_relative.value(".." +/+ ".." +/+ ".." +/+ "r" +/+ "lib" +/+ "r.scd");
+	var rrrr = include_relative.value(r_engine_root +/+ "lib" +/+ "r.scd");
 
 	var init = rrrr[\init];
 	var free = rrrr[\free];
