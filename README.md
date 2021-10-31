@@ -34,13 +34,13 @@ Options are available in the global parameters list.
 
 Script options:
 
-- `Pattern Length` - 8 or 16. Pattern length is automatically changed to connected grid's width.
-- `Patterns` - 1..99. Selects which pattern to edit and play.
-- `Last Row Cuts` - Yes or No. If yes row 8 will cut playhead position.
-- `Quantize Cutting` - Yes or No. If yes playhead position cutting will be quantized to one step.
-- `Beats Per Pattern` - 1..8.
-- `Tempo` - 20-300 BPM.
-- `Swing Amount` - amount to swing odd steps (0-100%).
+- `pattern length` - 8 or 16. Pattern length is automatically changed to connected grid's width.
+- `patterns` - 1..99. Selects which pattern to edit and play.
+- `last row cuts` - Yes or No. If yes row 8 will cut playhead position.
+- `quantize cutting` - Yes or No. If yes playhead position cutting will be quantized to one step.
+- `beats per pattern` - 1..8.
+- `tempo` - 20-300 BPM.
+- `swing amount` - amount to swing odd steps (0-100%).
 
 The script exposes [`Ack` engine parameters](https://github.com/antonhornquist/ack/blob/master/README.md#default-parameters) for each channel.
 
