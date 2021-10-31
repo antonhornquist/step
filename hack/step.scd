@@ -27,6 +27,8 @@ var ack_add_params = ack_lib[\add_params];
 
 var prev_grid_width;
 var grid_width;
+var grid_device;
+var arc_device;
 
 var ui_dirty = false;
 
@@ -250,7 +252,7 @@ init_pattern_length_param =
 	~params.add_((
 		type: "option",
 		id: "pattern_length",
-		name: "Pattern Length",
+		name: "pattern length",
 		options: [8, 16],
 		default: 2
 	));
@@ -262,7 +264,7 @@ init_pattern_param =
 	~params.add_((
 		type: "number",
 		id: "pattern",
-		name: "Pattern",
+		name: "pattern",
 		min: 1,
 		max: num_patterns,
 		default: 1,
@@ -278,7 +280,7 @@ init_last_row_cuts_param =
 	~params.add_((
 		type: "option",
 		id: "last_row_cuts",
-		name: "Last Row Cuts",
+		name: "last row cuts",
 		options: ["No", "Yes"],
 		default: 1
 	));
@@ -290,7 +292,7 @@ init_cut_quant_param =
 	~params.add_((
 		type: "option",
 		id: "cut_quant",
-		name: "Quantize Cutting",
+		name: "quantize cutting",
 		options: ["No", "Yes"],
 		default: 1
 	));
@@ -302,7 +304,7 @@ init_beats_per_pattern_param =
 	~params.add_((
 		type: "number",
 		id: "beats_per_pattern",
-		name: "Beats Per Pattern",
+		name: "beats per pattern",
 		min: 1,
 		max: 8,
 		default: 4,
@@ -318,7 +320,7 @@ init_tempo_param =
 	~params.add_((
 		type: "control",
 		id: "tempo",
-		name: "Tempo",
+		name: "tempo",
 		controlspec: tempo_spec,
 		action: {
 			update_sequencer_metro_time.value();
@@ -333,7 +335,7 @@ init_swing_amount_param =
 	~params.add_((
 		type: "control",
 		id: "swing_amount",
-		name: "Swing Amount",
+		name: "swing amount",
 		controlspec: swing_amount_spec,
 		action: { |val|
 			update_even_odd_ppqn.value(val);
@@ -386,21 +388,21 @@ refresh_grid_button =
 { |x, y|
 	if (cutting_is_enabled.value() and: (y == 8)) {
 		if (x == playpos) {
-			~grid_device.led_(x, y, playpos_level);
+			grid_device.led_(x, y, playpos_level);
 		} {
-			~grid_device.led_(x, y, clear_level);
+			grid_device.led_(x, y, clear_level);
 		};
 	} {
 		case {trig_is_set.value(~params.get_("pattern"), x, y)} {
-			~grid_device.led_(x, y, trig_level)
+			grid_device.led_(x, y, trig_level)
 		}
 		{ x == playpos } {
-			~grid_device.led_(x, y, playpos_level)
+			grid_device.led_(x, y, playpos_level)
 		}
 		{ true } {
-			~grid_device.led_(x, y, clear_level)
+			grid_device.led_(x, y, clear_level)
 		}
-	}
+	};
 };
 
 var
@@ -408,7 +410,7 @@ refresh_grid_column =
 { |x|
 	(1..num_tracks).do { |y|
 		refresh_grid_button.value(x, y)
-	}
+	};
 };
 
 var
@@ -418,15 +420,15 @@ refresh_grid =
 		refresh_grid_column.value(stepnum)
 	};
 
-	~grid_device.refresh_();
+	grid_device.refresh_();
 };
 
 var
 update_grid_width =
 {
-	if (~grid_device.device_.notNil) {
-		if (grid_width != ~grid_device.cols_) {
-			grid_width = ~grid_device.cols_;
+	if (grid_device.device_.notNil) {
+		if (grid_width != grid_device.cols_) {
+			grid_width = grid_device.cols_;
 		};
 	};
 };
@@ -434,10 +436,10 @@ update_grid_width =
 var
 refresh_arc =
 {
-	~arc_device.all_(0);
-	~arc_device.led_(1, arc_led_x_spec.map(~params.get_raw_("tempo")), arc_led_l_spec.maxval);
-	~arc_device.led_(2, arc_led_x_spec.map(~params.get_raw_("swing_amount")), arc_led_l_spec.maxval);
-	~arc_device.refresh_();
+	arc_device.all_(0);
+	arc_device.led_(1, arc_led_x_spec.map(~params.get_raw_("tempo")), arc_led_l_spec.maxval);
+	arc_device.led_(2, arc_led_x_spec.map(~params.get_raw_("swing_amount")), arc_led_l_spec.maxval);
+	arc_device.refresh_();
 };
 
 var
@@ -472,9 +474,8 @@ init_ui_refresh_metro =
 var
 init_arc =
 {
-	~arc_device = ~arc.connect_();
-	~arc_device[\delta] = { |n, delta| // not .delta notation to suppress self argument?
-		flash_event.value();
+	arc_device = ~arc.connect_();
+	arc_device[\delta] = { |n, delta| // not .delta notation to suppress self argument?
 		case {n == 1} {
 			var val = ~params.get_raw_("tempo");
 			~params.set_raw_("tempo", val+(delta/500));
@@ -483,14 +484,16 @@ init_arc =
 			var val = ~params.get_raw_("swing_amount");
 			~params.set_raw_("swing_amount", val+(delta/500));
 		};
+		flash_event.value();
+		ui_dirty = true;
 	};
 };
 
 var
 init_grid =
 {
-	~grid_device = ~grid.connect_();
-	~grid_device[\key] = { |x, y, state|
+	grid_device = ~grid.connect_();
+	grid_device[\key] = { |x, y, state|
 		if (state == 1) {
 			if (cutting_is_enabled.value() and: (y == 8)) {
 				queued_playpos = x;
@@ -614,9 +617,9 @@ cleanup =
 	~params.write_();
 	save_patterns.value();
 
-	if (~grid_device.device_.notNil) {
-		~grid_device.all_(0);
-		~grid_device.refresh_();
+	if (grid_device.device_.notNil) {
+		grid_device.all_(0);
+		grid_device.refresh_();
 	};
 };
 

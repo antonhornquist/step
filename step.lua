@@ -7,6 +7,8 @@ local Ack = require 'ack/lib/ack'
 
 local prev_grid_width
 local grid_width
+local grid_device
+local arc_device
 
 local ui_dirty = false
 
@@ -75,13 +77,15 @@ end
 local
 set_trig =
 function(patternno, stepnum, tracknum, value)
-  trigs[get_trigs_index(patternno, stepnum, tracknum)] = value
+  local index = get_trigs_index(patternno, stepnum, tracknum)
+  trigs[index] = value
 end
 
 local
 trig_is_set =
 function(patternno, stepnum, tracknum)
-  return trigs[get_trigs_index(patternno, stepnum, tracknum)]
+  local index = get_trigs_index(patternno, stepnum, tracknum)
+  return trigs[index]
 end
 
 local
@@ -168,7 +172,7 @@ function()
   end
 
   if (not ticks_to_next) or ticks_to_next == 0 then
-    local trigs = {}
+    local ts = {}
     local previous_playpos = playpos
     if queued_playpos then
       playpos = queued_playpos
@@ -181,12 +185,12 @@ function()
     end
     for tracknum=1,num_tracks do
       if trig_is_set(params:get("pattern"), playpos, tracknum) and not (cutting_is_enabled() and tracknum == 8) then
-        trigs[tracknum] = 1
+        ts[tracknum] = 1
       else
-        trigs[tracknum] = 0
+        ts[tracknum] = 0
       end
     end
-    engine.multiTrig(trigs[1], trigs[2], trigs[3], trigs[4], trigs[5], trigs[6], trigs[7], trigs[8])
+    engine.multiTrig(ts[1], ts[2], ts[3], ts[4], ts[5], ts[6], ts[7], ts[8])
 
     if is_even(playpos) then
       ticks_to_next = even_ppqn
@@ -226,7 +230,7 @@ function()
   params:add {
     type="option",
     id="pattern_length",
-    name="Pattern Length",
+    name="pattern length",
     options={8, 16},
     default=16
   }
@@ -238,7 +242,7 @@ function()
   params:add {
     type="number",
     id="pattern",
-    name="Pattern",
+    name="pattern",
     min=1,
     max=num_patterns,
     default=1,
@@ -254,7 +258,7 @@ function()
   params:add {
     type="option",
     id="last_row_cuts",
-    name="Last Row Cuts",
+    name="last row cuts",
     options={"No", "Yes"},
     default=1
   }
@@ -266,7 +270,7 @@ function()
   params:add {
     type="option",
     id="cut_quant",
-    name="Quantize Cutting",
+    name="quantize cutting",
     options={"No", "Yes"},
     default=1
   }
@@ -278,7 +282,7 @@ function()
   params:add {
     type="number",
     id="beats_per_pattern",
-    name="Beats Per Pattern",
+    name="beats per pattern",
     min=1,
     max=8,
     default=4,
@@ -294,7 +298,7 @@ function()
   params:add {
     type="control",
     id="tempo",
-    name="Tempo",
+    name="tempo",
     controlspec=tempo_spec,
     action=function(val)
       update_sequencer_metro_time()
@@ -309,7 +313,7 @@ function()
   params:add {
     type="control",
     id="swing_amount",
-    name="Swing Amount",
+    name="swing amount",
     controlspec=swing_amount_spec,
     action=function(val)
       update_even_odd_ppqn(val)
