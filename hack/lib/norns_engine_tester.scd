@@ -1,3 +1,4 @@
+// TODO: rename method_'s to method__'s
 (
 var include_relative = { |relative_path|
 	var path = (PathName(thisProcess.nowExecutingPath).pathOnly +/+ relative_path).standardizePath;
@@ -324,29 +325,36 @@ namespaces.poll_manager = {
 				var new_poll;
 
 				new_poll = ();
-				new_poll.is_running_ = false;
+				new_poll[\is_running_] = false;
 				new_poll.time_ = engine_poll_time ? 0.25;
 				new_poll.action_ = callback;
 
 				new_poll.start_ = { |self|
-					if (self.is_running_.not) {
+					if (self[\is_running_].not) {
 						self.task_ = Task {
 							inf.do {
 								self[\action_].value(engine_poll_func.value); // TODO: wrap in Environment.use
 								self.time_.wait;
 							}
 						}.play;
+						self[\is_running_] = true;
 						// "poll started".inform;
 					} {
 						"poll already started".inform;
 					};
 				};
 				new_poll.stop_ = { |self|
-					if (self.is_running_) {
+					if (self[\is_running_]) {
 						self.task_.stop;
+						self[\is_running_] = false;
+						// "poll stopped".inform;
 					} {
 						"poll already stopped".inform;
 					};
+				};
+				new_poll.free_ = { |self|
+					self.stop_();
+					self['__polls__'].remove(self);
 				};
 				new_poll.update_ = { |self|
 					{
@@ -362,11 +370,18 @@ namespaces.poll_manager = {
 			};
 		};
 
+		poll_manager.free_all_ = { |self|
+			self['__polls__'].copy.do { |poll|
+				poll.free_();
+			};
+		};
+
 		poll_manager;
 	};
 
 	var free_poll_manager = { |poll_manager|
-		// TODO: stop tasks, etc
+		// TODO poll_manager['__polls__'].do { |poll| poll.free_() };
+		poll_manager.free_all_();
 	};
 
 	var module = IdentityDictionary[
@@ -432,7 +447,7 @@ namespaces.metro_manager = {
 	};
 
 	var free_metro_manager = { |metro_manager|
-		// TODO: stop metros, etc -- free all will do?
+		metro_manager.free_all_();
 	};
 
 	var module = IdentityDictionary[
@@ -916,7 +931,7 @@ namespaces.paramset = {
 			var param = self.lookup_param_(id);
 			param[\name];
 		};
-		paramset.set__ = { |self, id, value|
+		paramset.set__ = { |self, id, value| // TODO: set__
 			var param = self.lookup_param_(id);
 			param.set__(value);
 		};
@@ -1385,6 +1400,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 
 		var poll_manager = namespaces[\poll_manager];
 		var init_poll_manager = poll_manager[\init_poll_manager];
+		var free_poll_manager = poll_manager[\free_poll_manager];
 
 		var paramset = namespaces[\paramset];
 		var init_paramset = paramset[\init_paramset];
@@ -1511,7 +1527,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 						})
 						.keyDownAction_({ |view, char, modifiers, unicode, keycode, key|
 							var ctrl_pressed = modifiers & 262144 == 262144;
-							if (ctrl_pressed and: (keycode == 32)) {
+							if (ctrl_pressed and: (keycode == 32) or: (keycode == 27)) {
 								CmdPeriod.run;
 							};
 						});
@@ -1523,7 +1539,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 				var mouse_move_pos;
 
 				var scale_mouse_pos = { |x, y|
-					(round(x/scale)+1 /*max: 1*/)@(round(y/scale)+1 /*max: 1*/)
+					(round(x/scale)+1 /* TODO max: 1*/)@(round(y/scale)+1 /* TODO max: 1*/)
 				};
 
 				var mouse_enter_action = { |view|
@@ -1714,9 +1730,10 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 		};
 
 		var free_script = { |script_env|
-			free_midi_device_manager.value(script_env);
-			free_arc_device_manager.value(script_env);
-			free_grid_device_manager.value(script_env);
+			free_poll_manager.value(script_env[\poll]);
+			free_midi_device_manager.value(script_env[\midi]);
+			free_arc_device_manager.value(script_env[\arc]);
+			free_grid_device_manager.value(script_env[\grid]);
 		};
 
 		var select_script_environment = { |script_index|
@@ -1761,6 +1778,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 			fork { // TODO: what was this about? polls still trying to getSynchronous ?
 				0.2.wait;
 				engine_free_func.value;
+				~scripts.remove(script_env); // TODO: this removes from the currentEnvironment - do this in topEnvironment instead?
 			};
 			"removing CmdPeriod teardown function...".inform;
 			CmdPeriod.remove(teardown_function);

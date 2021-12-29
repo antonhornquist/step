@@ -32,15 +32,10 @@ var arc_device;
 
 var ui_dirty = false;
 
-var refresh_rate = 35;
+var ui_refresh_rate = 35;
 
 var event_flash_duration = 0.15;
 var event_flash_frame_counter = nil;
-
-var arc_led_x_spec = ControlSpec(1, 64, 'linear', 1, 0, "");
-var arc_led_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
-var tempo_spec = ControlSpec.new(20, 300, 'lin', 0.1, 60, "BPM");
-var swing_amount_spec = ControlSpec.new(0, 100, 'lin', 0.1, 0, "%");
 
 var hi_level = 15;
 var lo_level = 4;
@@ -59,6 +54,11 @@ var key2_y = 64;
 
 var key3_x = key2_x+45;
 var key3_y = key2_y;
+
+var arc_led_x_spec = ControlSpec(1, 64, 'linear', 1, 0, "");
+var arc_led_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
+var tempo_spec = ControlSpec.new(20, 300, 'lin', 0.1, 60, "BPM");
+var swing_amount_spec = ControlSpec.new(0, 100, 'lin', 0.1, 0, "%");
 
 var num_patterns = 99;
 var steps_per_pattern = 16;
@@ -81,6 +81,167 @@ var odd_ppqn;
 var even_ppqn;
 
 var trigs = Array.fill(num_patterns*steps_per_pattern*num_tracks);
+
+var
+flash_event =
+{
+	event_flash_frame_counter = round(event_flash_duration * ui_refresh_rate);
+};
+  
+var
+event_indicator_should_be_shown =
+{
+	event_flash_frame_counter.notNil
+};
+
+var
+update_event_indicator =
+{
+	if (event_flash_frame_counter.notNil) {
+		event_flash_frame_counter = event_flash_frame_counter - 1;
+		case
+		{ event_flash_frame_counter <= 0 } {
+			event_flash_frame_counter = nil;
+		};
+		ui_dirty = true;
+	};
+};
+
+var
+init_grid =
+{
+	grid_device = ~grid.connect_();
+	grid_device[\key] = { |x, y, state|
+		if (state == 1) {
+			if (cutting_is_enabled.value() and: (y == 8)) {
+				queued_playpos = x;
+			} {
+				set_trig.value(
+					~params.get_("pattern"),
+					x,
+					y,
+					trig_is_set.value(~params.get_("pattern"), x, y).not
+				);
+			}
+		};
+		flash_event.value();
+		ui_dirty = true;
+	};
+};
+
+var
+refresh_grid_button =
+{ |x, y|
+	if (cutting_is_enabled.value() and: (y == 8)) {
+		if (x == playpos) {
+			grid_device.led_(x, y, playpos_level);
+		} {
+			grid_device.led_(x, y, clear_level);
+		};
+	} {
+		case {trig_is_set.value(~params.get_("pattern"), x, y)} {
+			grid_device.led_(x, y, trig_level)
+		}
+		{ x == playpos } {
+			grid_device.led_(x, y, playpos_level)
+		}
+		{ true } {
+			grid_device.led_(x, y, clear_level)
+		}
+	};
+};
+
+var
+refresh_grid_column =
+{ |x|
+	(1..num_tracks).do { |y|
+		refresh_grid_button.value(x, y)
+	};
+};
+
+var
+refresh_grid =
+{
+	(1..steps_per_pattern).do { |stepnum|
+		refresh_grid_column.value(stepnum)
+	};
+
+	grid_device.refresh_();
+};
+
+var
+update_grid_width =
+{
+	if (grid_device.device_.notNil) {
+		if (grid_width != grid_device.cols_) {
+			grid_width = grid_device.cols_;
+		};
+	};
+};
+
+var
+init_arc =
+{
+	arc_device = ~arc.connect_();
+	arc_device[\delta] = { |n, delta| // not .delta notation to suppress self argument?
+		case {n == 1} {
+			var val = ~params.get_raw_("tempo");
+			~params.set_raw_("tempo", val+(delta/500));
+		}
+		{n == 2} {
+			var val = ~params.get_raw_("swing_amount");
+			~params.set_raw_("swing_amount", val+(delta/500));
+		};
+		flash_event.value();
+		ui_dirty = true;
+	};
+};
+
+var
+refresh_arc =
+{
+	arc_device.all_(0);
+	arc_device.led_(1, arc_led_x_spec.map(~params.get_raw_("tempo")), arc_led_l_spec.maxval);
+	arc_device.led_(2, arc_led_x_spec.map(~params.get_raw_("swing_amount")), arc_led_l_spec.maxval);
+	arc_device.refresh_();
+};
+
+var
+refresh_ui =
+{
+	update_event_indicator.value();
+
+	update_grid_width.value();
+	if (prev_grid_width != grid_width) {
+		set_pattern_length.value(grid_width);
+		prev_grid_width = grid_width;
+		ui_dirty = true;
+	};
+
+	if (ui_dirty) {
+		~redraw.value();
+		refresh_arc.value();
+		refresh_grid.value();
+		ui_dirty = false;
+	};
+};
+
+var
+init_ui_refresh_metro =
+{
+	var ui_refresh_metro = ~metro.init_();
+	ui_refresh_metro.event = refresh_ui;
+	ui_refresh_metro.time = 1/ui_refresh_rate;
+	ui_refresh_metro.start_();
+};
+
+var
+init_ui =
+{
+	init_arc.value();
+	init_grid.value();
+	init_ui_refresh_metro.value();
+};
 
 var
 cutting_is_enabled =
@@ -359,167 +520,6 @@ init_params =
 };
 
 var
-flash_event =
-{
-	event_flash_frame_counter = round(event_flash_duration * refresh_rate);
-};
-  
-var
-event_indicator_should_be_shown =
-{
-	event_flash_frame_counter.notNil
-};
-
-var
-update_event_indicator =
-{
-	if (event_flash_frame_counter.notNil) {
-		event_flash_frame_counter = event_flash_frame_counter - 1;
-		case
-		{ event_flash_frame_counter <= 0 } {
-			event_flash_frame_counter = nil;
-		};
-		ui_dirty = true;
-	};
-};
-
-var
-refresh_grid_button =
-{ |x, y|
-	if (cutting_is_enabled.value() and: (y == 8)) {
-		if (x == playpos) {
-			grid_device.led_(x, y, playpos_level);
-		} {
-			grid_device.led_(x, y, clear_level);
-		};
-	} {
-		case {trig_is_set.value(~params.get_("pattern"), x, y)} {
-			grid_device.led_(x, y, trig_level)
-		}
-		{ x == playpos } {
-			grid_device.led_(x, y, playpos_level)
-		}
-		{ true } {
-			grid_device.led_(x, y, clear_level)
-		}
-	};
-};
-
-var
-refresh_grid_column =
-{ |x|
-	(1..num_tracks).do { |y|
-		refresh_grid_button.value(x, y)
-	};
-};
-
-var
-refresh_grid =
-{
-	(1..steps_per_pattern).do { |stepnum|
-		refresh_grid_column.value(stepnum)
-	};
-
-	grid_device.refresh_();
-};
-
-var
-update_grid_width =
-{
-	if (grid_device.device_.notNil) {
-		if (grid_width != grid_device.cols_) {
-			grid_width = grid_device.cols_;
-		};
-	};
-};
-
-var
-refresh_arc =
-{
-	arc_device.all_(0);
-	arc_device.led_(1, arc_led_x_spec.map(~params.get_raw_("tempo")), arc_led_l_spec.maxval);
-	arc_device.led_(2, arc_led_x_spec.map(~params.get_raw_("swing_amount")), arc_led_l_spec.maxval);
-	arc_device.refresh_();
-};
-
-var
-refresh_ui =
-{
-	update_event_indicator.value();
-	update_grid_width.value();
-
-	if (prev_grid_width != grid_width) {
-		set_pattern_length.value(grid_width);
-		prev_grid_width = grid_width;
-		ui_dirty = true;
-	};
-
-	if (ui_dirty) {
-		~redraw.value();
-		refresh_arc.value();
-		refresh_grid.value();
-		ui_dirty = false;
-	};
-};
-
-var
-init_ui_refresh_metro =
-{
-	var ui_refresh_metro = ~metro.init_();
-	ui_refresh_metro.event = refresh_ui;
-	ui_refresh_metro.time = 1/refresh_rate;
-	ui_refresh_metro.start_();
-};
-
-var
-init_arc =
-{
-	arc_device = ~arc.connect_();
-	arc_device[\delta] = { |n, delta| // not .delta notation to suppress self argument?
-		case {n == 1} {
-			var val = ~params.get_raw_("tempo");
-			~params.set_raw_("tempo", val+(delta/500));
-		}
-		{n == 2} {
-			var val = ~params.get_raw_("swing_amount");
-			~params.set_raw_("swing_amount", val+(delta/500));
-		};
-		flash_event.value();
-		ui_dirty = true;
-	};
-};
-
-var
-init_grid =
-{
-	grid_device = ~grid.connect_();
-	grid_device[\key] = { |x, y, state|
-		if (state == 1) {
-			if (cutting_is_enabled.value() and: (y == 8)) {
-				queued_playpos = x;
-			} {
-				set_trig.value(
-					~params.get_("pattern"),
-					x,
-					y,
-					trig_is_set.value(~params.get_("pattern"), x, y).not
-				);
-			}
-		};
-		flash_event.value();
-		ui_dirty = true;
-	};
-};
-
-var
-init_ui =
-{
-	init_arc.value();
-	init_grid.value();
-	init_ui_refresh_metro.value();
-};
-
-var
 get_play_label =
 {
 	if (playing) {
@@ -530,25 +530,25 @@ get_play_label =
 };
 
 var
+draw_text =
+{ |x_pos, y_pos, level, text|
+	~screen.move_(x_pos, y_pos);
+	~screen.level_(level);
+	~screen.text_(text);
+};
+
+var
 redraw_enc1_widget =
 {
-	~screen.move_(enc1_x, enc1_y);
-	~screen.level_(lo_level);
-	~screen.text_("LEVEL");
-	~screen.move_(enc1_x+45, enc1_y);
-	~screen.level_(hi_level);
-	~screen.text_(round(~params.get_raw_("main_level") * 100, 1));
+	draw_text.value(enc1_x, enc1_y, lo_level, "LEVEL");
+	draw_text.value(enc1_x+45, enc1_y, hi_level, round(~params.get_raw_("main_level") * 100, 1));
 };
 
 var
 redraw_param_widget =
-{ |x, y, label, value|
-	~screen.move_(x, y);
-	~screen.level_(lo_level);
-	~screen.text_(label);
-	~screen.move_(x, y+12);
-	~screen.level_(hi_level);
-	~screen.text_(value);
+{ |x_pos, y_pos, label, value|
+	draw_text.value(x_pos, y_pos, lo_level, label);
+	draw_text.value(x_pos, y_pos+12, hi_level, value);
 };
 
 var
@@ -566,25 +566,25 @@ redraw_enc3_widget =
 var
 redraw_key2_widget =
 {
-	~screen.move_(key2_x, key2_y);
+	var level;
 	if (playing) {
-		~screen.level_(lo_level);
+		level = lo_level;
 	} {
-		~screen.level_(hi_level);
+		level = hi_level;
 	};
-	~screen.text_("STOP");
+	draw_text.value(key2_x, key2_y, level, "STOP");
 };
 
 var
 redraw_key3_widget =
 {
-	~screen.move_(key3_x, key3_y);
+	var level;
 	if (playing) {
-		~screen.level_(hi_level);
+		level = hi_level;
 	} {
-		~screen.level_(lo_level);
+		level = lo_level;
 	};
-	~screen.text_(get_play_label.value());
+	draw_text.value(key3_x, key3_y, level, get_play_label.value());
 };
 
 var
@@ -639,6 +639,7 @@ redraw =
 	redraw_enc3_widget.value();
 	redraw_key2_widget.value();
 	redraw_key3_widget.value();
+
 	~screen.update_();
 };
 
