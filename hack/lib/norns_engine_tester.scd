@@ -767,7 +767,8 @@ namespaces.paramset = {
 	var init_paramset = { |script_env|
 		var paramset = (
 			name: "unnamed",
-			params: []
+			params: [],
+			count: 0
 		);
 
 		paramset.add_separator_ = { |self|
@@ -800,7 +801,7 @@ namespaces.paramset = {
 				param.get_ = { |self|
 					self[\path];
 				};
-				param.set__ = { |self, value, silent|
+				param.set__ = { |self, value, silent| // TODO: set__
 					value = value.asString;
 					if (self[\path] != value) {
 						self[\path] = value;
@@ -923,6 +924,7 @@ namespaces.paramset = {
 			};
 
 			self[\params] = self[\params].add(param);
+			self[\count] = self[\count] + 1;
 		};
 		paramset.lookup_param_ = { |self, id|
 			self[\params].detect { |param| param[\id] == id.asSymbol };
@@ -1330,7 +1332,7 @@ namespaces.r_engine = {
 				\delete -> { |self, moduleRef|
 					deleteCommand.value(r_instance, moduleRef);
 				},
-				\set -> { |self, moduleParameterRef, value|
+				\set -> { |self, moduleParameterRef, value| // TODO: compare with paramset - this turns into "set_" whereas paramset has "set__"
 					setCommand.value(r_instance, moduleParameterRef, value);
 				},
 				\bulkset -> { |self, bundle|
@@ -1388,23 +1390,269 @@ namespaces.r_engine = {
 	module
 }.value;
 
+namespaces.param_ui_manager = {
+
+	var screen_width = 128;
+	var screen_height = 64;
+	var screen_x_spec = ControlSpec(1, screen_width, 'linear', 1, 0, "");
+	var screen_y_spec = ControlSpec(1, screen_height, 'linear', 1, 0, "");
+	var screen_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
+
+	var hi_level = screen_l_spec.maxval;
+	var lo_level = round(screen_l_spec.maxval/4);
+	var mid_level = round((hi_level+lo_level)/2); // TODO
+
+	var redraw_row_label = { |label, y_pos, level|
+		~screen.level_(level);
+		~screen.move_(1, y_pos);
+		~screen.text_(label.asString);
+	};
+
+	var redraw_row_value = { |value, y_pos, level|
+		~screen.level_(level);
+		~screen.move_(128, y_pos);
+		~screen.text_right_(value.asString);
+	};
+
+	var redraw_param = { |param, y_pos, level|
+		case
+		{ param[\type] == 'separator' } {
+			redraw_row_label.value(Array.fill(35) { "_" }.join, y_pos, level);
+		}
+		{ ['file', 'control', 'option', 'number'].includes(param[\type]) } {
+			redraw_row_label.value(param[\name], y_pos, level);
+			redraw_row_value.value(param.string_(), y_pos, level);
+		};
+	};
+
+	var init_param_ui_manager = { |script_env|
+		var row_height = 10;
+		var params_per_page = 6;
+
+		var param_ui = (
+			cursor: 0
+		);
+
+		param_ui.redraw_ = { |self|
+			var cursor = self[\cursor];
+
+			~screen.clear_();
+			~screen.font_size_(8);
+
+			((-2) max: (((cursor-2) min: (~params[\count]-params_per_page)))..((cursor+3) min: (~params[\count]))).do { |param_index, index|
+				case
+				{param_index == -2} {
+					redraw_row_label.value("PARAMETERS", 1 + row_height, lo_level);
+				}
+				{param_index == -1} {
+				}
+				{true} {
+					if (param_index < ~params[\count]) {
+						var param = ~params[\params][param_index];
+						var level;
+						if ((param_ui[\active] == 'param_ui_row') and: ((index+1) == param_ui[\param_ui_row])) {
+							level = hi_level;
+						} {
+							if ((param_ui[\focus] == 'param_ui_row') and: ((index+1) == param_ui[\param_ui_row])) {
+								level = mid_level;
+							} {
+								if (param_index == cursor) {
+									level = hi_level;
+								} {
+									level = lo_level;
+								};
+							};
+						};
+						redraw_param.value(param, 1 + ((index+1) * row_height), level);
+					};
+				}
+			};
+
+			~screen.update_();
+		};
+
+		param_ui.key_ = { |self, n, z|
+			~redraw.value();
+		};
+
+		param_ui.enc_ = { |self, n, delta|
+			~redraw.value();
+		};
+
+		param_ui.kbdkey_ = { |self, keycode, z|
+			case
+			{(keycode == 40) and: (z == 1)} {
+				self[\cursor] = (self[\cursor] + 1) min: (~params[\count]-1);
+			}
+			{(keycode == 38) and: (z == 1)} {
+				self[\cursor] = (self[\cursor] - 1) max: 0;
+			}
+			{(keycode == 37) and: (z == 1)} {
+				var param = ~params[\params][self[\cursor]];
+				param.delta_(-1);
+			}
+			{(keycode == 39) and: (z == 1)} {
+				var param = ~params[\params][self[\cursor]];
+				param.delta_(1);
+			}
+			;
+			~redraw.value();
+		};
+
+		param_ui.mouse_ = { |self, what, args|
+			case
+			{ what == "leave" } {
+				self.mouse_leave_();
+			}
+			{ what == "over" } {
+				var x_pos = args[0], y_pos = args[1];
+				self.mouse_over_(x_pos, y_pos);
+			}
+			{ what == "down" } {
+				var x_pos = args[0], y_pos = args[1];
+				self.mouse_down_(x_pos, y_pos);
+			}
+			{ what == "move" } {
+				var x_pos = args[0], y_pos = args[1];
+				self.mouse_move_(x_pos, y_pos);
+			}
+			{ what == "up" } {
+				var x_pos = args[0], y_pos = args[1];
+				self.mouse_up_(x_pos, y_pos);
+			}
+			{ what == "wheel" } {
+				var x_delta = args[0], y_delta = args[1];
+				self.mouse_wheel_(x_delta, y_delta);
+			};
+			~redraw.value();
+		};
+
+		param_ui.within_param_value_bounds_ =
+		{ |self, pos|
+			self.get_row_at_(pos).notNil;
+		};
+
+		param_ui.get_row_at_ =
+		{ |self, pos|
+			round(pos.y / row_height);
+		};
+
+		param_ui.update_focus_ =
+		{ |self, pos|
+			case
+			{ self.within_param_value_bounds_(pos) } {
+				self.focus = 'param_ui_row';
+				self.param_ui_row = self.get_row_at_(pos);
+			}
+			{ true } {
+				self.focus = nil;
+				self.param_ui_row = nil;
+			};
+		};
+
+		param_ui.mouse_over_ =
+		{ |self, x_pos, y_pos|
+			self.mouse_over_pos = x_pos@y_pos;
+			self.update_focus_(self.mouse_over_pos); // TODO: only if mouse is not pressed(?)
+		};
+
+		param_ui.mouse_down_ =
+		{ |self, x_pos, y_pos|
+			self.mouse_down_pos = x_pos@y_pos;
+
+			case
+			{ self.focus == 'param_ui_row' } {
+			}
+			;
+
+			self.active = self.focus;
+		};
+
+		param_ui.mouse_move_ =
+		{ |self, x_pos, y_pos|
+			var mouse_move_delta;
+
+			var cursor = self[\cursor];
+			var prev_mouse_move_pos = self.mouse_move_pos;
+
+			self.mouse_move_pos = x_pos@y_pos;
+			mouse_move_delta = (prev_mouse_move_pos ? self.mouse_down_pos) - (x_pos@y_pos);
+
+			case
+			{ self.active == 'param_ui_row' } {
+				if (mouse_move_delta.y != 0) {
+					{ |cursor, param_ui_row, delta|
+						var param_index = ((-2) max: (((cursor-2) min: (~params[\count]-params_per_page)))..((cursor+3) min: (~params[\count])))[param_ui_row];
+						var param_in_focus = ~params[\params][param_index];
+
+						var fine = false; // TODO
+						var divisor;
+
+						if (param_in_focus.notNil) {
+							if (fine) {
+								divisor = 5;
+							} {
+								divisor = 1;
+							};
+							param_in_focus.delta_(delta/divisor);
+						};
+					}.value(self[\cursor], self[\param_ui_row]-1, mouse_move_delta.y);
+				};
+			}
+			;
+		};
+
+		param_ui.mouse_wheel_ =
+		{ |self, x_delta, y_delta|
+			if (y_delta != 0) {
+				case
+				{self.focus == 'param_ui_row'} {
+					{ |cursor, param_ui_row, delta|
+						var param_index = ((-2) max: (((cursor-2) min: (~params[\count]-params_per_page)))..((cursor+3) min: (~params[\count])))[param_ui_row];
+						var param_in_focus = ~params[\params][param_index];
+
+						var fine = false; // TODO
+						var divisor;
+
+						if (param_in_focus.notNil) {
+							if (fine) {
+								divisor = 5;
+							} {
+								divisor = 1;
+							};
+							param_in_focus.delta_(delta/divisor);
+						};
+					}.value(self[\cursor], self[\param_ui_row]-1, y_delta);
+				};
+			};
+		};
+
+		param_ui.mouse_up_ =
+		{ |self, x_pos, y_pos|
+			self.mouse_move_pos = nil;
+			self.active = nil;
+			self.update_focus_(x_pos@y_pos);
+		};
+
+		param_ui.mouse_leave_ =
+		{ |self|
+			self.focus = nil;
+		};
+
+		param_ui;
+	};
+
+	var module = IdentityDictionary[
+		\init_param_ui_manager -> init_param_ui_manager
+	];
+
+	module;
+}.value;
+
 if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using globals here
 	namespaces;
 } {
 	{
-		var screen = namespaces[\screen];
-		var init_screen = screen[\init_screen];
-
-		var metro_manager = namespaces[\metro_manager];
-		var init_metro_manager = metro_manager[\init_metro_manager];
-
-		var poll_manager = namespaces[\poll_manager];
-		var init_poll_manager = poll_manager[\init_poll_manager];
-		var free_poll_manager = poll_manager[\free_poll_manager];
-
-		var paramset = namespaces[\paramset];
-		var init_paramset = paramset[\init_paramset];
-
 		var arc_device_manager = namespaces[\arc_device_manager];
 		var init_arc_device_manager = arc_device_manager[\init_arc_device_manager];
 		var free_arc_device_manager = arc_device_manager[\free_arc_device_manager];
@@ -1416,6 +1664,23 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 		var grid_device_manager = namespaces[\grid_device_manager];
 		var init_grid_device_manager = grid_device_manager[\init_grid_device_manager];
 		var free_grid_device_manager = grid_device_manager[\free_grid_device_manager];
+
+		var poll_manager = namespaces[\poll_manager];
+		var init_poll_manager = poll_manager[\init_poll_manager];
+		var free_poll_manager = poll_manager[\free_poll_manager];
+
+		var metro_manager = namespaces[\metro_manager];
+		var init_metro_manager = metro_manager[\init_metro_manager];
+
+		var screen = namespaces[\screen];
+		var init_screen = screen[\init_screen];
+
+		var paramset = namespaces[\paramset];
+		var init_paramset = paramset[\init_paramset];
+
+		var param_ui_manager = namespaces[\param_ui_manager];
+		var init_param_ui_manager = param_ui_manager[\init_param_ui_manager];
+		var free_param_ui_manager = param_ui_manager[\free_param_ui_manager];
 
 		var scale = 6;
 		var screen_width = 128 * scale;
@@ -1477,17 +1742,32 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 							case
 								{ key_state[0].not and: shift_pressed }
 								{
+									script_env.use {
+										if (~norns[\showing_param_ui].asBoolean) {
+											switch_to_script.value();
+											~norns[\showing_param_ui] = false;
+										} {
+											switch_to_params_ui.value();
+											~norns[\showing_param_ui] = true;
+										};
+									};
+/*
+	TODO
 									key_state[0] = true;
 									script_env.use {
 										~key.value(1, 1);
 									};
+*/
 								}
 								{ key_state[0] and: shift_pressed.not }
 								{
+/*
+	TODO
 									key_state[0] = false;
 									script_env.use {
 										~key.value(1, 0);
 									};
+*/
 								}
 							;
 
@@ -1529,8 +1809,55 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 							var ctrl_pressed = modifiers & 262144 == 262144;
 							if (ctrl_pressed and: (keycode == 32) or: (keycode == 27)) {
 								CmdPeriod.run;
+							} {
+								// TODO [char, modifiers, unicode, keycode, key].debug(\down);
+								script_env.use {
+									~kbdkey.value(keycode, 1);
+								};
 							};
-						});
+						})
+						.keyUpAction_({ |view, char, modifiers, unicode, keycode, key|
+							script_env.use {
+								~kbdkey.value(keycode, 0);
+							};
+						})
+						;
+				};
+
+				var switch_to_script = {
+					var saved_script_hooks = ~norns[\saved_script_hooks];
+					~redraw = saved_script_hooks[\redraw];
+					~enc = saved_script_hooks[\enc];
+					~key = saved_script_hooks[\key];
+					~mouse = saved_script_hooks[\mouse];
+					~kbdkey = saved_script_hooks[\kbdkey];
+					~norns[\saved_script_hooks] = nil;
+					~redraw.value();
+				};
+
+				var switch_to_params_ui = {
+					~norns[\saved_script_hooks] = (
+						redraw: ~redraw,
+						enc: ~enc,
+						key: ~key,
+						mouse: ~mouse,
+						kbdkey: ~kbdkey,
+					);
+					~redraw = {
+						~param_ui.redraw_();
+					};
+					~enc = { |index, delta|
+						~param_ui.enc_(index, delta);
+					};
+					~key = { |index, state|
+						~param_ui.key_(index, state);
+					};
+					~mouse = { |what ... args|
+						~param_ui.mouse_(what, args);
+					};
+					~kbdkey = { |keycode, state|
+						~param_ui.kbdkey_(keycode, state);
+					};
 				};
 
 				var mouse_pressed_pos;
@@ -1626,6 +1953,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 					~midi = init_midi_device_manager.value(currentEnvironment);
 					~arc = init_arc_device_manager.value(currentEnvironment);
 					~grid = init_grid_device_manager.value(currentEnvironment);
+					~param_ui = init_param_ui_manager.value(currentEnvironment);
 
 					defer {
 						setup_window_mouse_and_key_hooks.value;
@@ -1657,7 +1985,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 								script_instance[\engine_free_func] = {
 									free_engine.value(r_engine_instance);
 								};
-								"R engine loaded".debug;
+								"R engine loaded".inform;
 								completeFunc.value;
 							};
 						}
@@ -1675,12 +2003,12 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 								script_instance[\engine_free_func] = {
 									free_engine.value(ack_engine_instance);
 								};
-								"Ack engine loaded".debug;
+								"Ack engine loaded".inform;
 								completeFunc.value;
 							};
 						}
 						{ true } {
-							"not supported engine".debug;
+							"not supported engine".error;
 							completeFunc.value;
 						};
 					}.value;
@@ -1693,7 +2021,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 
 				CmdPeriod.doOnce(teardown_function);
 
-				{ // defer since Qt requires properties to be set in AppClock
+				{ // deferred since Qt requires properties to be set in AppClock
 					screen_view
 						.mouseEnterAction_(mouse_enter_action)
 						.mouseOverAction_(mouse_over_action)
@@ -1801,3 +2129,4 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 	}.value;
 };
 )
+                                                                                                                                                                                               

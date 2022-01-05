@@ -30,6 +30,9 @@ var grid_width;
 var grid_device;
 var arc_device;
 
+var arc_led_x_spec = ControlSpec(1, 64, 'linear', 1, 0, "");
+var arc_led_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
+
 var ui_dirty = false;
 
 var ui_refresh_rate = 35;
@@ -55,8 +58,6 @@ var key2_y = 64;
 var key3_x = key2_x+45;
 var key3_y = key2_y;
 
-var arc_led_x_spec = ControlSpec(1, 64, 'linear', 1, 0, "");
-var arc_led_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
 var tempo_spec = ControlSpec.new(20, 300, 'lin', 0.1, 60, "BPM");
 var swing_amount_spec = ControlSpec.new(0, 100, 'lin', 0.1, 0, "%");
 
@@ -660,8 +661,8 @@ enc =
 
 ~
 key =
-{ |n, s|
-	case {(n == 2) and: (s == 1)} {
+{ |index, state|
+	case {(index == 2) and: (state == 1)} {
 		if (playing == false) {
 			playpos = 0;
 			queued_playpos = 1;
@@ -670,7 +671,7 @@ key =
 			sequencer_metro.stop_();
 		}
 	}
-	{(n == 3) and: (s == 1)} {
+	{(index == 3) and: (state == 1)} {
 		playing = true;
 		sequencer_metro.start_();
 	};
