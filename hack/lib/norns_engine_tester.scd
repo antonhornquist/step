@@ -4,14 +4,43 @@ var include_relative = { |relative_path|
 	var path = (PathName(thisProcess.nowExecutingPath).pathOnly +/+ relative_path).standardizePath;
 	if (File.exists(path)) {
 		var result = this.executeFile(path);
-		if (result.isNil) { Error("error importing %".format(path)).throw; } { result }; // TODO: adopt in other places too
+		if (result.isNil) { Error("error importing %".format(path)).throw; } { result };
 	} {
 		Error("include_relative: file % does not exist".format(path.quote)).throw;
 	};
 };
 
-var r_engine_root = ".." +/+ ".." +/+ ".." +/+ "r";
-var ack_engine_root = ".." +/+ ".." +/+ ".." +/+ "ack";
+var include_absolute = { |absolute_path|
+	var path = absolute_path.standardizePath;
+	if (File.exists(path)) {
+		var result = this.executeFile(path);
+		if (result.isNil) { Error("error importing %".format(path)).throw; } { result };
+	} {
+		Error("include_absolute: file % does not exist".format(path.quote)).throw;
+	};
+};
+
+var include_engine_dependency = { |engine_name|
+	var engine_root = engine_paths[engine_name.asSymbol][\absolute_path];
+	if (File.exists(engine_root)) {
+		include_absolute.value(engine_root +/+ "lib" +/+ (engine_name.asString ++ ".scd"));
+	} {
+		Error("include_engine_dependency: FAILED. expected engine % installed at %".format(engine_name, engine_root.quote)).throw; // TODO: ugly path
+	};
+};
+
+var lookup_absolute_path = { |relative_path|
+	(PathName(thisProcess.nowExecutingPath).pathOnly +/+ relative_path).standardizePath;
+};
+
+var engine_paths = (
+	ack: (
+		relative_path: ".." +/+ ".." +/+ ".." +/+ "ack"
+	),
+	r: (
+		relative_path: ".." +/+ ".." +/+ ".." +/+ "r"
+	),
+).collect { |dict, engine_name| dict[\absolute_path] = lookup_absolute_path.value(dict[\relative_path])};
 
 var namespaces = ();
 
@@ -1056,9 +1085,8 @@ namespaces.paramset = {
 	module;
 }.value;
 
-// TODO: load on demand
-namespaces.ack_engine = {
-	var ack = include_relative.value(ack_engine_root +/+ "lib" +/+ "ack.scd");
+namespaces.ack_engine_loader = {
+	var ack = include_engine_dependency.value(\ack);
 
 	var init = ack[\init];
 	var free = ack[\free];
@@ -1099,7 +1127,6 @@ namespaces.ack_engine = {
 
 	// server booted assumed
 	var load_engine = {
-		var tmp;
 		var ack_instance = init.value(
 			(
 				autostartServer: false,
@@ -1227,11 +1254,10 @@ namespaces.ack_engine = {
 	];
 
 	module
-}.value;
+};
 
-// TODO: load on demand
-namespaces.r_engine = {
-	var rrrr = include_relative.value(r_engine_root +/+ "lib" +/+ "r.scd");
+namespaces.r_engine_loader = {
+	var rrrr = include_engine_dependency.value(\r);
 
 	var init = rrrr[\init];
 	var free = rrrr[\free];
@@ -1388,7 +1414,7 @@ namespaces.r_engine = {
 	];
 
 	module
-}.value;
+};
 
 namespaces.param_ui_manager = {
 
@@ -1938,6 +1964,19 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 					pr_stop_script.value(script_instance);
 				};
 
+				var load_engine_library_lazily = { |engine_name|
+					var engine_namespace_sym = (engine_name.asString ++ "_engine").asSymbol;
+					var engine_namespace_string = engine_namespace_sym.asString;
+					if (namespaces[engine_namespace_sym].notNil) {
+						"in load_engine_library_lazily: using cached % engine library".format(engine_name.asString).inform;
+						namespaces[engine_namespace_sym]
+					} {
+						"in load_engine_library_lazily: loading % engine library anew".format(engine_name.asString).inform;
+						namespaces[engine_namespace_sym] = namespaces[(engine_namespace_string ++ "_loader").asSymbol].value;
+						namespaces[engine_namespace_sym];
+					};
+				};
+
 				script_env = Environment.make {
 					~norns = (
 						state: (
@@ -1972,11 +2011,11 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 	
 						case
 						{~engine[\name] == 'R' } {
-							s.waitForBoot {
-								var r_engine = namespaces[\r_engine];
-								var load_engine = r_engine[\load_engine];
-								var free_engine = r_engine[\free_engine];
+							var r_engine = load_engine_library_lazily.value(\r);
+							var load_engine = r_engine[\load_engine];
+							var free_engine = r_engine[\free_engine];
 
+							s.waitForBoot {
 								var r_engine_instance = load_engine.value;
 								var engine, polls;
 								# engine, poll_manager = setup_engine_globals.value(r_engine_instance[\commands], r_engine_instance[\polls]);
@@ -1990,11 +2029,11 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 							};
 						}
 						{~engine[\name] == 'Ack' } {
-							s.waitForBoot {
-								var ack_engine = namespaces[\ack_engine];
-								var load_engine = ack_engine[\load_engine];
-								var free_engine = ack_engine[\free_engine];
+							var ack_engine = load_engine_library_lazily.value(\ack);
+							var load_engine = ack_engine[\load_engine];
+							var free_engine = ack_engine[\free_engine];
 
+							s.waitForBoot {
 								var ack_engine_instance = load_engine.value;
 								var engine, polls;
 								# engine, poll_manager = setup_engine_globals.value(ack_engine_instance[\commands], ack_engine_instance[\polls]);
@@ -2129,4 +2168,3 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 	}.value;
 };
 )
-                                                                                                                                                                                               
