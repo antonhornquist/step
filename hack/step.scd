@@ -9,10 +9,9 @@ var include_relative = { |relative_path|
 	};
 };
 
-var ack_engine_root_relative = ".." +/+ ".." +/+ "ack" +/+ "lib";
+var ack_engine_root_relative = ".." +/+ ".." +/+ "ack";
 
-var lib_root_relative = "lib";
-var norns_engine_tester = include_relative.value(lib_root_relative +/+ "norns_engine_tester.scd");
+var norns_engine_tester = include_relative.value(ack_engine_root_relative +/+ "hack" +/+ "lib" +/+ "norns_engine_tester.scd");
 var start_script = norns_engine_tester['start_script'];
 var script_name = PathName(thisProcess.nowExecutingPath).fileNameWithoutExtension;
 
@@ -21,7 +20,7 @@ start_script.value(script_name) {
 // scriptname: step
 // v2.0.0 @jah
 
-var ack = include_relative.value(ack_engine_root_relative +/+ "ack.scd");
+var ack = include_relative.value(ack_engine_root_relative +/+ "lib" +/+ "ack.scd");
 var ack_lib = ack[\lib];
 var ack_add_params = ack_lib[\add_params];
 
